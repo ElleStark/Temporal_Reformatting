@@ -1,9 +1,12 @@
 # FlowField class
 # Elle Stark May 2024
 
+import numpy as np
+from scipy.interpolate import RegularGridInterpolator
+
 class FlowField:
 
-    def __init__(self, xmesh, ymesh, u_data, v_data, xmesh_uv, ymesh_uv, dt_uv, flipuv=True):
+    def __init__(self, xmesh, ymesh, u_data, v_data, xmesh_uv, ymesh_uv, dt_uv):
         super().__init__()
 
         self.x = xmesh
@@ -14,7 +17,7 @@ class FlowField:
         self.ymesh_uv = ymesh_uv
         self.dt_uv = dt_uv
 
-    def vfield(self, time, y):
+    def u_field(self, time, y, flipuv=True):
         """
         Calculates velocity field based on interpolation from existing data.
         :param y: array of particle locations where y[0] is array of x locations and y[1] is array of y locations
@@ -41,7 +44,7 @@ class FlowField:
 
         u_interp = RegularGridInterpolator((ymesh_vec, xmesh_vec), u_matrix,
                                            method='linear', bounds_error=False, fill_value=None)
-        v_interp = RegularGridInterpolator((ymesh_vec, xmesh_vec), np.squeeze(np.flipud(self.v_data[:, :, frame])),
+        v_interp = RegularGridInterpolator((ymesh_vec, xmesh_vec), v_matrix,
                                            method='linear', bounds_error=False, fill_value=None)
 
         # Interpolate u and v values at desired x (y[0]) and y (y[1]) points
@@ -52,7 +55,7 @@ class FlowField:
 
         return vfield
     
-    def compute_vfields(self, t):
+    def compute_ufields(self, t):
         """
         Computes spatial velocity field for list of desired times
         :param t: ndarray of time values at which velocity field will be calculated

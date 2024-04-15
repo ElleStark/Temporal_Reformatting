@@ -3,8 +3,10 @@
 
 
 class Simulation:
+    def __init__(self, flowfield, odorsource, duration, t0, dt) -> None:
+        pass
 
-    def track_particles_rw(self, n_particles, ic_idx_1, ic_idx_2, dt, duration, D, Lb):
+    def track_particles_rw(self, n_particles, ic_idx_1, ic_idx_2, dt, duration, D, Lb, scheme = 'IE'):
         """
         Uses Lagrangian particle tracking model with random walk diffusion to calculate particle positions over time
         for two 'blobs' of particles initialized at two different locations.
