@@ -1,60 +1,44 @@
+# Class to create and run simulation
+# Elle Stark, May 2024
 
-
+import numpy as np
 
 
 class Simulation:
     def __init__(self, flowfield, odorsource, duration, t0, dt) -> None:
-        pass
+        self.flowfield = flowfield
+        self.odorsource = odorsource
+        self.duration = duration
+        self.t0 = t0
+        self.dt = dt
 
-    def track_particles_rw(self, n_particles, ic_idx_1, ic_idx_2, dt, duration, D, Lb, scheme = 'IE'):
+    def track_particles_rw(self, n_particles, dt, duration, D, Lb, method = 'IE'):
         """
         Uses Lagrangian particle tracking model with random walk diffusion to calculate particle positions over time
-        for two 'blobs' of particles initialized at two different locations.
-        :param n_particles: float, number of particles to track
-        :param ic_idx_1: list [x, y] of center of particle group 1 (will be colored red)
-        :param ic_idx_2: list [x, y] of center of particle group 1 (will be colored blue)
+        for sets of particles initialized at the same location at different times.
+        :param n_particles: float, number of particles to release and track AT EACH FRAME
         :param dt: float, length of timestep
         :param duration: float, total time to transport particles
         :param D: float, diffusion coefficient
-        :return: two nd arrays, each representing the positions over time for one 'blob' (set of particles)
+        :return: nd array representing the positions over time for sets of particles released at a single location dt apart
         """
 
-        L = abs(int(duration / dt))  # need to calculate if dt definition is not based on T
+        # Define starting matrix for particles (all released at same location)
+        src_loc = self.odorsource.osrc_loc
+
+        L = abs(int(duration / dt))  # number of frames
         #nx = len(self.x[0, :])
         #ny = len(self.y[:, 0])
-        nx = 100
-        ny = 50
-
-        # Se up initial conditions for particles in both 'blobs'
-        # Even concentration of particles in square of size (batchelor scale x batchelor scale)
-        # Calculations result in a 'rounding' of the number of particles to make the square
-        square_length = ceil(sqrt(n_particles))
-        n_particles = square_length**2
-
-        # Blob 1
-        blob1 = np.zeros((2, n_particles))
-        x_idxs1 = np.linspace(ic_idx_1[0] - Lb/2, ic_idx_1[0] + Lb/2, square_length)
-        y_idxs1 = np.linspace(ic_idx_1[1] - Lb/2, ic_idx_1[1] + Lb/2, square_length)
-        x_ic1, y_ic1 = np.meshgrid(x_idxs1, y_idxs1)
-        blob1[0, :] = x_ic1.reshape(n_particles)
-        blob1[1, :] = y_ic1.reshape(n_particles)
-
-        # Blob 2
-        blob2 = np.zeros((2, n_particles))
-        x_idxs2 = np.linspace(ic_idx_2[0] - Lb/2, ic_idx_2[0] + Lb/2, square_length)
-        y_idxs2 = np.linspace(ic_idx_2[1] - Lb/2, ic_idx_2[1] + Lb/2, square_length)
-        x_ic2, y_ic2 = np.meshgrid(x_idxs2, y_idxs2)
-        blob2[0, :] = x_ic2.reshape(n_particles)
-        blob2[1, :] = y_ic2.reshape(n_particles)
 
         # at each timestep, advect particles and add diffusion with random walk
-        blob1_single_steps = np.zeros((2, L, n_particles))
-        blob2_single_steps = np.zeros((2, L, n_particles))
+        trajectories = np.zeros((2, L, n_particles))
 
         for step in range(L):
             tstep = step * dt
 
-            # Blob 1 (red blob) - particle positions
+            # numerical advection & diffusion of particles
+            if method=='IE':
+                loc_out = utils.ImprovedEuler_singlestep(dt, tstep, )
             blob1_out = self.improvedEuler_singlestep(dt, tstep, blob1) + sqrt(2 * D * dt) * np.random.randn(*blob1.shape)
             #blob1_out = blob1 + self.vfield(tstep, blob1) * dt + sqrt(2 * D * dt) * np.random.randn(blob1.shape[0], blob1.shape[1])
             #blob1_out = blob1 + self.vfield(tstep, blob1) * dt

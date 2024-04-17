@@ -56,7 +56,7 @@ def main():
     # Create odor object
     odor = OdorSource(tau, osrc_loc, D_osrc)
 
-    # Use flowfield, odor, and parameters to generate particle simulation object
+    # Use flowfield, odor, and simulation parameters to generate particle simulation object
     test_sim = 
 
     # output: array with tagged particle #, time released, trajectory (x, y position at each dt)

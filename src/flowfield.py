@@ -28,17 +28,19 @@ class FlowField:
         # Convert from time to frame
         frame = int(time / self.dt_uv)
 
-        # axes must be in ascending order, so need to flip y-axis, which also means flipping u and v upside-down
-        ymesh_vec = np.flipud(self.ymesh_uv)[:, 0]
+        # vector of x values
         xmesh_vec = self.xmesh_uv[0, :]
 
         # Set up interpolation functions
         # can use cubic interpolation for continuity of the between the segments (improve smoothness)
         # set bounds_error=False to allow particles to go outside the domain by extrapolation
         if flipuv: 
+            # axes must be in ascending order, so need to flip y-axis, which also means flipping u and v upside-down
+            ymesh_vec = np.flipud(self.ymesh_uv)[:, 0]
             u_matrix = np.squeeze(np.flipud(self.u_data[:, :, frame]))
             v_matrix = np.squeeze(np.flipud(self.v_data[:, :, frame]))
         else: 
+            ymesh_vec = self.ymesh_uv[0, :]
             u_matrix = np.squeeze(self.u_data[:, :, frame])
             v_matrix = np.squeeze(self.v_data[:, :, frame])
 
