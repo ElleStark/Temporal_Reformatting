@@ -7,6 +7,7 @@ from flowfield import FlowField
 import h5py
 import numpy as np
 from odor import OdorSource
+from simulation import Simulation
 
 def main():
     # Define data subset
@@ -46,7 +47,7 @@ def main():
     ymesh_sim = np.flipud(ymesh_sim)
 
     # Create flowfield object
-    flow = FlowField(xmesh_sim, ymesh_sim, u_data, v_data, xmesh_uv, ymesh_uv, dt)
+    flow = FlowField(xmesh_sim, ymesh_sim, u_data, v_data, xmesh_uv, ymesh_uv, dt_sim)
 
     # Odor source properties
     osrc_loc = [423, 0]  # indexes relative to x_lims and y_lims subset of domain, source location at which to release particles
@@ -57,18 +58,21 @@ def main():
     odor = OdorSource(tau, osrc_loc, D_osrc)
 
     # Use flowfield, odor, and simulation parameters to generate particle simulation object
-    test_sim = 
+    duration = time_array_data[-1]
+    t0 = 0
+    test_sim = Simulation(flow, odor, duration, t0, dt_sim)
 
-    # output: array with tagged particle #, time released, trajectory (x, y position at each dt)
-
+    # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
+    n_particles = 1  # particles to be released AT EACH TIMESTEP
+    diffusion = 0
+    test_sim.track_particles_rw(n_particles, diffusion, method='IE')
 
     # Save raw trajectory data
+    f_name = 'ignore/tests/oneparticle_fullsim.npy'
+    np.save(f_name, test_sim.trajectories)
 
-    # Compute desired information from simulation
-
-    # Output processed data
-
-    # Plot results (if desired)
+    # Plot results
+    
 
 if __name__=='__main__':
     main()
