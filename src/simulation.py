@@ -77,9 +77,11 @@ class Simulation:
         """
 
         for frame in frames:
-            plt.scatter(self.trajectories[frame, 1, :], self.trajectories[frame, 0, :])
-            plt.xlim = (0, 0.5)
-            plt.ylim = (-0.211, 0.211)
+            plt.close()
+            fig, ax = plt.subplots()
+            plt.scatter(self.trajectories[frame, 0, :], self.trajectories[frame, 1, :])
+            plt.xlim(0, 0.5)
+            plt.ylim(-0.211, 0.211)
             f_name = filepath + f'_frame{frame}.png'
             plt.savefig(f_name, dpi=dpi)
     

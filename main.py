@@ -3,12 +3,9 @@
 # In collaboration with J Victor, Weill Cornell Medical College
 # May 2024
 
-# from flowfield import FlowField
 import h5py
 import numpy as np
 from src import flowfield, odor, simulation, utils
-# from odor import OdorSource
-# from simulation import Simulation
 
 
 def main():
