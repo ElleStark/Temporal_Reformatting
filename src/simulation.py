@@ -4,8 +4,6 @@
 from math import sqrt
 import matplotlib.pyplot as plt
 import numpy as np
-import utils
-
 
 class Simulation:
     def __init__(self, flowfield, odorsource, duration, t0, dt) -> None:
@@ -17,7 +15,7 @@ class Simulation:
         self.trajectories = None
 
     # track LOCAL STRAIN RATE - transfer function in terms of Peclet # (see Villermo paper)
-    def track_particles_rw(self, n_particles, D, method = 'IE'):
+    def track_particles_rw(self, n_particles, method = 'IE'):
         """
         Uses Lagrangian particle tracking model with random walk diffusion to calculate particle positions over time
         for sets of particles initialized at the same location at different times.
@@ -25,7 +23,7 @@ class Simulation:
         :param dt: float, length of timestep
         :param duration: float, total time to transport particles in seconds
         :param D: float, diffusion coefficient
-        :return: nd array representing the positions over time for sets of particles released at a single location dt apart
+        saves nd array representing the positions over time for sets of particles released at a single location dt apart
         """
 
         # Define number of frames and list of times
@@ -36,33 +34,34 @@ class Simulation:
 
         # Extract relevant variables
         src_loc = self.odorsource.osrc_loc
+        D = self.odorsource.D_osrc
 
         # initialize array of particle trajectory data
         # stack of matrices with dimensions: frame, particle release time, x index, y index
-        trajectories = np.empty((n_frames, n_particles*n_frames, 3))
+        trajectories = np.empty((n_frames, 2, n_particles*(n_frames)))
         trajectories[:] = np.nan
-        trajectories[:, :, 0] = np.repeat(t_list, n_particles)
+        # trajectories[:, :, 0] = np.repeat(t_list, n_particles)
 
         start_idx = 0
         end_idx = n_particles
 
         # at each timestep, release particles and transport all particles in domain using advection and random walk diffusion 
-        for step in range(n_frames):
+        for step in range(n_frames-1):
             tstep = t_list[step]
 
             # seed new particles at source location
-            trajectories[step, start_idx:end_idx, 1] = src_loc[0]
-            trajectories[step, start_idx:end_idx, 2] = src_loc[1]
-            loc_in = trajectories[step, 0:end_idx, 1:2]
+            trajectories[step, 0, start_idx:end_idx] = src_loc[1]
+            trajectories[step, 1, start_idx:end_idx] = src_loc[0]
+            loc_in = trajectories[step, :, 0:end_idx]
 
             # numerical advection & diffusion of all particles
             if method=='IE':
-                loc_out = self.flowfield.ImprovedEuler_singlestep(dt, tstep, loc_in) + sqrt(2 * D * dt) * np.random.randn(*trajectories.shape)
+                loc_out = self.flowfield.improvedEuler_singlestep(dt, tstep, loc_in) + np.sqrt(2 * D * dt) * np.random.randn(*loc_in.shape)
             elif method=='RK4':
-                loc_out = self.flowfield.rk4singlestep(dt, tstep, loc_in)
+                loc_out = self.flowfield.rk4singlestep(dt, tstep, loc_in) + np.sqrt(2 * D * dt) * np.random.randn(*loc_in.shape)
 
             # save position of each particle at this step
-            trajectories[step + 1, 0:end_idx, 1:2] = loc_out
+            trajectories[step + 1, :, 0:end_idx] = loc_out
             
             # shift indices to include next batch of particles starting at (0, 0)
             start_idx = end_idx
@@ -70,9 +69,18 @@ class Simulation:
 
         self.trajectories = trajectories
 
-    def plot_trajectories(self, frames, domain_width, domain_length):
+    def plot_trajectories(self, filepath, frames, domain_width, domain_length, dpi=300, movie=False):
         """
-        
+
+        if movie=False, saves individual plots of particle locations for each frame 
+        if movie=True, all frames are saved together as an .mp4 file
         """
+
+        for frame in frames:
+            plt.scatter(self.trajectories[frame, 1, :], self.trajectories[frame, 0, :])
+            plt.xlim = (0, 0.5)
+            plt.ylim = (-0.211, 0.211)
+            f_name = filepath + f'_frame{frame}.png'
+            plt.savefig(f_name, dpi=dpi)
     
     

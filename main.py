@@ -3,11 +3,13 @@
 # In collaboration with J Victor, Weill Cornell Medical College
 # May 2024
 
-from flowfield import FlowField
+# from flowfield import FlowField
 import h5py
 import numpy as np
-from odor import OdorSource
-from simulation import Simulation
+from src import flowfield, odor, simulation, utils
+# from odor import OdorSource
+# from simulation import Simulation
+
 
 def main():
     # Define data subset
@@ -47,32 +49,33 @@ def main():
     ymesh_sim = np.flipud(ymesh_sim)
 
     # Create flowfield object
-    flow = FlowField(xmesh_sim, ymesh_sim, u_data, v_data, xmesh_uv, ymesh_uv, dt_sim)
+    flow = flowfield.FlowField(xmesh_sim, ymesh_sim, u_data, v_data, xmesh_uv, ymesh_uv, dt_sim)
 
     # Odor source properties
-    osrc_loc = [423, 0]  # indexes relative to x_lims and y_lims subset of domain, source location at which to release particles
-    tau = 0.1  # seconds, time between particle releases
-    D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
+    osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
+    tau = dt  # seconds, time between particle releases
+    # D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
+    D_osrc = 0 
 
     # Create odor object
-    odor = OdorSource(tau, osrc_loc, D_osrc)
+    odor_src = odor.OdorSource(tau, osrc_loc, D_osrc)
 
     # Use flowfield, odor, and simulation parameters to generate particle simulation object
-    duration = time_array_data[-1]
+    duration = time_array_data[-2]
     t0 = 0
-    test_sim = Simulation(flow, odor, duration, t0, dt_sim)
+    test_sim = simulation.Simulation(flow, odor_src, duration, t0, dt_sim)
 
     # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
-    n_particles = 1  # particles to be released AT EACH TIMESTEP
-    diffusion = 0
-    test_sim.track_particles_rw(n_particles, diffusion, method='IE')
+    n_particles = 5  # particles to be released AT EACH TIMESTEP
+    test_sim.track_particles_rw(n_particles, method='IE')
 
     # Save raw trajectory data
     f_name = 'ignore/tests/oneparticle_fullsim.npy'
     np.save(f_name, test_sim.trajectories)
 
     # Plot results
-    
+    f_path = f'ignore/tests/traj_plot_n{n_particles}_d{odor_src.D_osrc}'
+    test_sim.plot_trajectories(f_path, frames=[0, 100, 500, 1000, 2000, -1], domain_width=domain_width, domain_length=domain_length)
 
 if __name__=='__main__':
     main()
