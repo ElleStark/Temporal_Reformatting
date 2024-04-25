@@ -3,6 +3,7 @@
 
 from math import sqrt
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import numpy as np
 
 class Simulation:
@@ -12,6 +13,7 @@ class Simulation:
         self.duration = duration
         self.t0 = t0
         self.dt = dt
+        self.n_frames = abs(int(duration / dt)) 
         self.trajectories = None
 
     # track LOCAL STRAIN RATE - transfer function in terms of Peclet # (see Villermo paper)
@@ -75,14 +77,37 @@ class Simulation:
         if movie=False, saves individual plots of particle locations for each frame 
         if movie=True, all frames are saved together as an .mp4 file
         """
-
-        for frame in frames:
-            plt.close()
+        if movie:
             fig, ax = plt.subplots()
-            plt.scatter(self.trajectories[frame, 0, :], self.trajectories[frame, 1, :])
-            plt.xlim(0, 0.5)
-            plt.ylim(-0.211, 0.211)
-            f_name = filepath + f'_frame{frame}.png'
-            plt.savefig(f_name, dpi=dpi)
+
+            positions = plt.scatter(self.trajectories[frames[0], 0, :], self.trajectories[frames[0], 1, :])
+
+            # Plotting configuration
+            ax.set(xlim=[0, domain_length], ylim=[0-domain_width/2, domain_width/2], xlabel='x', ylabel='y')
+            ax.set_aspect('equal', adjustable='box')
+
+            def animate(frame):
+                positions.set_offsets(self.trajectories[frame, :, :].T)
+                return positions,
+    
+            # use FuncAnimation from matplotlib
+            ani = animation.FuncAnimation(fig=fig, func=animate, frames=len(frames), interval=500, blit=False)
+
+            # save and show video
+            f = filepath + '_movie.mp4'
+            writervideo = animation.FFMpegWriter(fps=10)
+            ani.save(f, writer=writervideo)
+
+        else:
+            for frame in frames:
+                plt.close()
+                fig, ax = plt.subplots()
+                plt.scatter(self.trajectories[frame, 0, :], self.trajectories[frame, 1, :])
+                plt.xlim(0, 0.5)
+                plt.ylim(-0.211, 0.211)
+                f_name = filepath + f'_frame{frame}.png'
+                plt.savefig(f_name, dpi=dpi)
+
+
     
     

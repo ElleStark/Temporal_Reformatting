@@ -51,8 +51,8 @@ def main():
     # Odor source properties
     osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
     tau = dt  # seconds, time between particle releases
-    # D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
-    D_osrc = 0 
+    D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
+    # D_osrc = 0 
 
     # Create odor object
     odor_src = odor.OdorSource(tau, osrc_loc, D_osrc)
@@ -63,7 +63,7 @@ def main():
     test_sim = simulation.Simulation(flow, odor_src, duration, t0, dt_sim)
 
     # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
-    n_particles = 5  # particles to be released AT EACH TIMESTEP
+    n_particles = 50  # particles to be released AT EACH TIMESTEP
     test_sim.track_particles_rw(n_particles, method='IE')
 
     # Save raw trajectory data
@@ -72,7 +72,7 @@ def main():
 
     # Plot results
     f_path = f'ignore/tests/traj_plot_n{n_particles}_d{odor_src.D_osrc}'
-    test_sim.plot_trajectories(f_path, frames=[0, 100, 500, 1000, 2000, -1], domain_width=domain_width, domain_length=domain_length)
+    test_sim.plot_trajectories(f_path, frames=list(range(test_sim.n_frames)), domain_width=domain_width, domain_length=domain_length, movie=True)
 
 if __name__=='__main__':
     main()
