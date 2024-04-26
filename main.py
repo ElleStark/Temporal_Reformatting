@@ -51,8 +51,8 @@ def main():
     # Odor source properties
     osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
     tau = dt  # seconds, time between particle releases
-    D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
-    # D_osrc = 0 
+    # D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
+    D_osrc = 0 
 
     # Create odor object
     odor_src = odor.OdorSource(tau, osrc_loc, D_osrc)
@@ -63,12 +63,12 @@ def main():
     test_sim = simulation.Simulation(flow, odor_src, duration, t0, dt_sim)
 
     # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
-    n_particles = 20  # particles to be released AT EACH TIMESTEP
+    n_particles = 1  # particles to be released AT EACH TIMESTEP
     test_sim.track_particles_rw(n_particles, method='IE')
 
     # Save raw trajectory data
     # save to Numpy array:
-    f_name = f'ignore/tests/particleTracking_n{n_particles}_fullsim.npy'
+    f_name = f'ignore/tests/particleTracking_n{n_particles}_fullsim_D{D_osrc}.npy'
     np.save(f_name, test_sim.trajectories)
 
     # Plot results
@@ -76,7 +76,7 @@ def main():
     test_sim.plot_trajectories(f_path, frames=list(range(test_sim.n_frames)), domain_width=domain_width, domain_length=domain_length, movie=True)
 
     # save to .mat file:
-    f_path = f'ignore/tests/ParticleTracking_MSPlumeSim_n{n_particles}_t60s.mat'
+    f_path = f'ignore/tests/ParticleTracking_MSPlumeSim_n{n_particles}_t60s_D{D_osrc}.mat'
     scipy.io.savemat(f_path, {'data': test_sim.trajectories, 'meta':{'ParticleTrackingParams':{'num_particles': f'{n_particles} seeded each frame', 'num_frames': '2999', 'dt': '0.02 sec', 'duration': '60 sec', 'diffusionCoefficient': f'{D_osrc} m^2/s', 'gridResolution': '0.0005 meter', 'ParticleReleasePoint': '(0, 0)', 'NumericalAdvectionMethod': 'Improved Euler'}, 
                                                 'FlowfieldSimulationInfo':{'description':'2D grid turbulence Comsol model', 'source': 'Fisher Plume manuscript Tootoonian et al., 2024', 'meanVelocity': '10 cm/s', 'xDomain': '[0, 0.5] meters', 'yDomain': '[-0.211, 0.211] meters'}, 
                                                 'FileCreationInfo': {'creationDate': 'April 2024', 'createdBy': 'Elle Stark, EFD Lab, CU Boulder CEAE Dept', 'contact': 'elle.stark@colorado.edu or aaron.true@colorado.edu'}}})

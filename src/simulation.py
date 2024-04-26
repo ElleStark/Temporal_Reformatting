@@ -42,19 +42,21 @@ class Simulation:
 
         # initialize array of particle trajectory data
         # stack of matrices with dimensions: frame, particle release time, x index, y index
-        trajectories = np.empty((n_frames, 3, n_particles*(n_frames)), dtype=np.float32)
+        trajectories = np.empty((n_frames+1, 3, n_particles*(n_frames+1)), dtype=np.float32)
         trajectories[:] = np.nan
         # trajectories[:, :, 0] = np.repeat(t_list, n_particles)
 
         start_idx = 0
         end_idx = n_particles
 
+        trajectories[:, 0, :] = np.repeat(t_list[:], n_particles)
+
         # at each timestep, release particles and transport all particles in domain using advection and random walk diffusion 
-        for step in range(n_frames-2):
+        for step in range(n_frames):
             tstep = t_list[step][0]
 
             # seed new particles at source location
-            trajectories[step, 0, start_idx:end_idx] = tstep
+            # trajectories[step, 0, start_idx:end_idx] = tstep
             trajectories[step, 1, start_idx:end_idx] = src_loc[1]
             trajectories[step, 2, start_idx:end_idx] = src_loc[0]
             loc_in = trajectories[step, 1:3, 0:end_idx]
