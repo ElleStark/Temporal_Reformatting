@@ -5,8 +5,8 @@
 
 import h5py
 import numpy as np
-from src import flowfield, odor, simulation, utils
-
+from src import flowfield, odor, simulation
+import scipy.io
 
 def main():
     # Define data subset
@@ -63,16 +63,23 @@ def main():
     test_sim = simulation.Simulation(flow, odor_src, duration, t0, dt_sim)
 
     # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
-    n_particles = 50  # particles to be released AT EACH TIMESTEP
+    n_particles = 20  # particles to be released AT EACH TIMESTEP
     test_sim.track_particles_rw(n_particles, method='IE')
 
     # Save raw trajectory data
-    f_name = 'ignore/tests/oneparticle_fullsim.npy'
+    # save to Numpy array:
+    f_name = f'ignore/tests/particleTracking_n{n_particles}_fullsim.npy'
     np.save(f_name, test_sim.trajectories)
 
     # Plot results
-    f_path = f'ignore/tests/traj_plot_n{n_particles}_d{odor_src.D_osrc}'
+    f_path = f'ignore/tests/traj_plot_n{n_particles}_d{round(odor_src.D_osrc, 1)}'
     test_sim.plot_trajectories(f_path, frames=list(range(test_sim.n_frames)), domain_width=domain_width, domain_length=domain_length, movie=True)
+
+    # save to .mat file:
+    f_path = f'ignore/tests/ParticleTracking_MSPlumeSim_n{n_particles}_t60s.mat'
+    scipy.io.savemat(f_path, {'data': test_sim.trajectories, 'meta':{'ParticleTrackingParams':{'num_particles': f'{n_particles} seeded each frame', 'num_frames': '2999', 'dt': '0.02 sec', 'duration': '60 sec', 'diffusionCoefficient': f'{D_osrc} m^2/s', 'gridResolution': '0.0005 meter', 'ParticleReleasePoint': '(0, 0)', 'NumericalAdvectionMethod': 'Improved Euler'}, 
+                                                'FlowfieldSimulationInfo':{'description':'2D grid turbulence Comsol model', 'source': 'Fisher Plume manuscript Tootoonian et al., 2024', 'meanVelocity': '10 cm/s', 'xDomain': '[0, 0.5] meters', 'yDomain': '[-0.211, 0.211] meters'}, 
+                                                'FileCreationInfo': {'creationDate': 'April 2024', 'createdBy': 'Elle Stark, EFD Lab, CU Boulder CEAE Dept', 'contact': 'elle.stark@colorado.edu or aaron.true@colorado.edu'}}})
 
 if __name__=='__main__':
     main()
