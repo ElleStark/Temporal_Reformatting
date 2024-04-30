@@ -71,7 +71,7 @@ class Simulation:
             trajectories[step+1, 1:3, 0:end_idx] = loc_out
 
             # If particle has left the domain, set x and y position to Nan
-            mask = ((trajectories[step+1, 1, :] > 0.5) | (trajectories[step+1, 2, :] > 0.211) | (trajectories[step+1, 2, :] < -0.211))
+            mask = ((trajectories[step+1, 1, :] > 0.5) | (trajectories[step+1, 1, :] < 0) | (trajectories[step+1, 2, :] > 0.211) | (trajectories[step+1, 2, :] < -0.211))
             trajectories[step+1, 1:3, mask] = np.nan
             
             # shift indices to include next batch of particles starting at (0, 0)
