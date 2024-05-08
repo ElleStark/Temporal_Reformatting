@@ -1,8 +1,11 @@
 # FlowField class
 # Elle Stark May 2024
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
+from scipy.fft import fft, fftfreq
+
 
 class FlowField:
 
@@ -104,7 +107,7 @@ class FlowField:
 
         # Loop through time, assigning velocity field [x, y, u, v] for each t
         for time in t:
-            vfield = self.vfield(time, [self.x, self.y])
+            vfield = self.u_field(time, [self.x, self.y])
             # need to extract u and v from vfield array
             u = vfield[0]
             v = vfield[1]
@@ -113,4 +116,56 @@ class FlowField:
         vfield_dict = dict(zip(t, vfields))
 
         self.velocity_fields = vfield_dict
+
+    def find_shedding_freq(self, xlim, ylim, plot=True):
+        """
+        Computes vortex shedding frequency of cylinder array by computing the fundamental frequency at each location across the input, 
+        based on the Direct Fourier Transform of the time series of u velocity. 
+        :param xlim: array [min, max] of index for x limits
+        :param ylim: array [min, max] of index for y limits
+        :param plot: boolean, if True, plots fft for random sample of 50 locations
+        """
+        # Define number of sample points N and sample spacing T
+        N = len(self.u_data[0, 0, :])
+        T = self.dt_uv
+        nx = xlim[1] - xlim[0]
+        ny = ylim[1] - ylim[0]
+
+        xidxs = list(range(xlim[0], xlim[1]))
+        yidxs = list(range(ylim[0], ylim[1]))
+
+        # fft_list = np.empty((nx*ny, 1))
+        fft_list = []
+        # at each point, compute Direct Fourier Transform using numpy's fft() function
+        for y in yidxs:
+            for x in xidxs:
+                u_timeseries = self.u_data[y, x, :]
+                u_fluct = u_timeseries - np.mean(u_timeseries)
+                # Compute autocorrelation coefficients for u velocity
+                # r_u = np.correlate(u_fluct, u_fluct, mode='full')
+                # r_u = r_u[r_u.size//2:]        
+                
+                u_freq = fft(u_fluct)
+                # u_freq_power = np.square(fft(u_fluct))
+                fft_list.append(u_freq)
+                
+                # QC: time series of u data
+                plt.close()
+                fig, ax = plt.subplots(figsize=(12, 5))
+                plt.plot(u_fluct)
+                plt.savefig('ignore/tests/fft_u_timeseries473.png', dpi=300)
+
+        # x_vals = np.linspace(0.0, N*T, N, endpoint=False)
+        x_freq = fftfreq(N, T)[:N//2]
+
+        if plot:
+            plt.close()
+            plt.plot(x_freq, 2.0/N * np.abs(u_freq[:N//2]))
+            # plt.plot(x_freq, 2.0/N * np.abs(u_freq_power[:N//2]), alpha=0.5)
+            plt.xlim(0, 5)
+            plt.savefig('ignore/tests/fft_test473.png', dpi=300)
+                
+
+                
+
 
