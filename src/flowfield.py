@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.fft import fft, fftfreq
+from scipy.signal import stft
 
 
 class FlowField:
@@ -117,7 +118,7 @@ class FlowField:
 
         self.velocity_fields = vfield_dict
 
-    def find_shedding_freq(self, xlim, ylim, plot=True):
+    def find_plot_psd(self, xlim, ylim, plot=True):
         """
         Computes vortex shedding frequency of cylinder array by computing the fundamental frequency at each location across the input, 
         based on the Direct Fourier Transform of the time series of u velocity. 
@@ -145,25 +146,32 @@ class FlowField:
                 # r_u = np.correlate(u_fluct, u_fluct, mode='full')
                 # r_u = r_u[r_u.size//2:]        
                 
-                u_freq = fft(u_fluct)
+                # u_freq = fft(u_fluct)
+                f, t, Zxx = stft(u_fluct, fs=0.02, nperseg=50, scaling='psd')
+                df, dt = f[1] - f[0], t[1] - t[0]
+                psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df
+                # psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df * dt
                 # u_freq_power = np.square(fft(u_fluct))
-                fft_list.append(u_freq)
+                # fft_list.append(u_freq)
                 
                 # QC: time series of u data
                 plt.close()
                 fig, ax = plt.subplots(figsize=(12, 5))
                 plt.plot(u_fluct)
-                plt.savefig('ignore/tests/fft_u_timeseries473.png', dpi=300)
+                plt.savefig('ignore/tests/stft_u_timeseries473.png', dpi=300)
 
         # x_vals = np.linspace(0.0, N*T, N, endpoint=False)
-        x_freq = fftfreq(N, T)[:N//2]
+        # x_freq = fftfreq(N, T)[:N//2]
 
         if plot:
             plt.close()
-            plt.plot(x_freq, 2.0/N * np.abs(u_freq[:N//2]))
-            # plt.plot(x_freq, 2.0/N * np.abs(u_freq_power[:N//2]), alpha=0.5)
-            plt.xlim(0, 5)
-            plt.savefig('ignore/tests/fft_test473.png', dpi=300)
+            plt.plot(psd)
+            plt.savefig('ignore/tests/psd_test.png', dpi=300)
+
+            # plt.plot(x_freq, 2.0/N * np.abs(u_freq[:N//2]))
+            # # plt.plot(x_freq, 2.0/N * np.abs(u_freq_power[:N//2]), alpha=0.5)
+            # plt.xlim(0, 5)
+            # plt.savefig('ignore/tests/fft_test473.png', dpi=300)
                 
 
                 

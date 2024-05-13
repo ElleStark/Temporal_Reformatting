@@ -49,7 +49,7 @@ def main():
     flow = flowfield.FlowField(xmesh_sim, ymesh_sim, u_data, v_data, xmesh_uv, ymesh_uv, dt_sim)
 
     # Approximate and plot vortex shedding frequency at input if desired using fft
-    # flow.find_shedding_freq([0, 1], [473, 474], plot=True)
+    # flow.find_plot_psd([0, 1], [473, 474], plot=True)
 
     # Odor source properties
     osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
