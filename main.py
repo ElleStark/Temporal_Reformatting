@@ -13,7 +13,6 @@ def main():
     x_lims = slice(None, None)
     y_lims = slice(None, None)
     time_lims = slice(None, None)
-    odor_name = 'c1a'
 
     # Import required data from H5 file
     f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
@@ -72,18 +71,19 @@ def main():
     # Save raw trajectory data
     note = 'nanUpstream'
     # save to Numpy array:
-    f_name = f'ignore/tests/particleTracking_n{n_particles}_fullsim_D{D_osrc}_{note}.npy'
+    sim = 2
+    f_name = f'ignore/tests/particleTracking_sim{sim}_n{n_particles}_fullsim_D{D_osrc}_{note}.npy'
     np.save(f_name, test_sim.trajectories)
 
     # Plot results
-    f_path = f'ignore/tests/traj_plot_n{n_particles}_d{round(odor_src.D_osrc, 1)}_{note}'
+    f_path = f'ignore/tests/traj_plot_sim{sim}_n{n_particles}_d{round(odor_src.D_osrc, 1)}_{note}'
     test_sim.plot_trajectories(f_path, frames=list(range(test_sim.n_frames)), domain_width=domain_width, domain_length=domain_length, movie=True)
 
     # save to .mat file:
-    f_path = f'ignore/tests/ParticleTracking_MSPlumeSim_n{n_particles}_t60s_D{D_osrc}_{note}.mat'
+    f_path = f'ignore/tests/ParticleTracking_sim{sim}_MSPlumeSim_n{n_particles}_t60s_D{D_osrc}_{note}.mat'
     scipy.io.savemat(f_path, {'data': test_sim.trajectories, 'meta':{'ParticleTrackingParams':{'num_particles': f'{n_particles} seeded each frame', 'num_frames': '3000', 'dt': '0.02 sec', 'duration': '60 sec', 'diffusionCoefficient': f'{D_osrc} m^2/s', 'gridResolution': '0.0005 meter', 'ParticleReleasePoint': '(0, 0)', 'NumericalAdvectionMethod': 'Improved Euler'}, 
                                                 'FlowfieldSimulationInfo':{'description':'2D grid turbulence Comsol model', 'source': 'Fisher Plume manuscript Tootoonian et al., 2024', 'meanVelocity': '10 cm/s', 'xDomain': '[0, 0.5] meters', 'yDomain': '[-0.211, 0.211] meters'}, 
-                                                'FileCreationInfo': {'creationDate': 'April 2024', 'createdBy': 'Elle Stark, EFD Lab, CU Boulder CEAE Dept', 'contact': 'elle.stark@colorado.edu or aaron.true@colorado.edu'}}})
+                                                'FileCreationInfo': {'creationDate': 'May 2024', 'createdBy': 'Elle Stark, EFD Lab, CU Boulder CEAE Dept', 'contact': 'elle.stark@colorado.edu or aaron.true@colorado.edu'}}})
 
 if __name__=='__main__':
     main()
