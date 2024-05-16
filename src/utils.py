@@ -13,7 +13,7 @@ import numpy as np
 f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
 x_lims = slice(None, None)
 y_lims = slice(None, None)
-time_lims = slice(1053, 1054)
+time_lims = slice(1153, 1154)
 
 with h5py.File(f_name, 'r') as f:
         # Numeric grids
@@ -95,9 +95,9 @@ traj1_list = [0, 1, 3]
 traj2_list = [0, 4, 3]
 
 for i in range(3):
-    plt.plot(traj1_x[:, traj1_list[i]], traj1_y[:, traj1_list[i]], color='#B85B51', alpha=alpha, linestyle='dashed')
+    plt.plot(traj1_x[:, traj1_list[i]], traj1_y[:, traj1_list[i]], color='#B85B51', alpha=alpha, linestyle='solid')
     plt.scatter(select_trajs1[duration-1, 1, traj1_list[i]], select_trajs1[duration-1, 2, traj1_list[i]], color='#B85B51', alpha=alpha)
-    plt.plot(traj2_x[:, traj2_list[i]], traj2_y[:, traj2_list[i]], color='#588D9D', alpha=alpha, linestyle='dashed')
+    plt.plot(traj2_x[:, traj2_list[i]], traj2_y[:, traj2_list[i]], color='#588D9D', alpha=alpha, linestyle='solid')
     plt.scatter(select_trajs2[duration-dt_frames-1, 1, traj2_list[i]], select_trajs2[duration-dt_frames-1, 2, traj2_list[i]], color='#588D9D', alpha=alpha)
 
 # different formatting for simultaneously detected particles
