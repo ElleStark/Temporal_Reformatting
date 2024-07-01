@@ -3,12 +3,23 @@
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import logging
+import time
+
+# Set up logging for convenient messages
+logger = logging.getLogger('LagrangeStrainsPy')
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s"))
+logger.addHandler(handler)
+INFO = logger.info
+WARN = logger.warn
+DEBUG = logger.debug
 
 def add_newfield_to_particles(particle_data, new_data, field2=None):
+    INFO("Begin function to add new fields")
     n_particles, n_features, n_tsteps = particle_data.shape
-
-    # Empty array to hold new values
-    # new_vals = np.full((n_particles, n_tsteps), np.nan)
+    DEBUG(f"number of particles={n_particles}, number of features={n_features}, number of timesteps={n_tsteps}")
     
     # Flatten and mask particle data
     particles_flat = particle_data.reshape(-1, n_features)
@@ -19,7 +30,9 @@ def add_newfield_to_particles(particle_data, new_data, field2=None):
 
     # Filter to valid particles & timesteps
     valid_particles = particles_flat[valid_mask]
+    DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
     valid_timesteps = timesteps[valid_mask]
+    DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
 
     # Obtain x and y coordinates and extract new field values
     x_coords = valid_particles[:, 1].astype(int)
@@ -29,14 +42,21 @@ def add_newfield_to_particles(particle_data, new_data, field2=None):
     new_vals[valid_mask] = new_data[valid_timesteps, x_coords, y_coords]
     new_vals = new_vals.reshape(n_tsteps, n_particles)
     # Concatenate to original data
+    DEBUG("Concatenating new data to existing matrix")
+    start = time.time()
     particle_data_expanded = np.concatenate((particle_data, new_vals[:, np.newaxis, :]), axis=1)
+    DEBUG(f"Concatenation completed in {round(time.time()-start, 2)} sec.")
     
     if field2 != None:
         new_vals2 = np.full(particles_flat.shape[0], np.nan)
         new_vals2[valid_mask] = field2[valid_timesteps, x_coords, y_coords]
         new_vals2 = new_vals2.reshape(n_tsteps, n_particles)
+        DEBUG("Concatenating new data field 2 to existing matrix")
+        start = time.time()
         particle_data_expanded = np.concatenate((particle_data_expanded, new_vals2[:, np.newaxis, :]), axis=1)
+        DEBUG(f"Concatenation 2 completed in {round(time.time()-start, 2)} sec.")
 
+    INFO("New fields added to particle data.")
     return particle_data_expanded
 
 
@@ -61,7 +81,10 @@ def main():
     # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain and acceleration at that time step
     particles_w_strain_acc = add_newfield_to_particles(particle_matrix, strain_data, field2=accel_x)
     # Data matrix is now: release time, x, y, strain, & acceleration at each time step
-    np.save('ignore/ParticleTrackingData/ParticleStrainsAccel_sim1_n20_t60_D1.5.npy')
+    file_name = 'ignore/ParticleTrackingData/ParticleStrainsAccel_sim1_n20_t60_D1.5.npy'
+    INFO(f"Saving expanded particle data to {file_name}.")
+    np.save(file_name)
+    INFO("Save complete.")
 
     # PLOT: many-line plot of strain as f(t) with 0 as release time
     # QC: spatial plot of strain vals at a few times
