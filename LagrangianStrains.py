@@ -5,10 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import time
+import cmasher as cmr
 
 # Set up logging for convenient messages
 logger = logging.getLogger('LagrangeStrainsPy')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s"))
 logger.addHandler(handler)
@@ -22,24 +23,27 @@ def add_newfield_to_particles(particle_data, new_data, field2=None):
     DEBUG(f"number of particles={n_particles}, number of features={n_features}, number of timesteps={n_tsteps}")
     
     # Flatten and mask particle data
-    particles_flat = particle_data.reshape(-1, n_features, order='C')
-    valid_mask = ~np.isnan(particles_flat[:, 1]) & ~np.isnan(particles_flat[:, 2])
+    particles_reorder = particle_data.transpose(1, 0, 2)
+    particles_flat = particles_reorder.reshape(n_features, n_tsteps * n_particles)
+    valid_mask = ~np.isnan(particles_flat[1, :]) & ~np.isnan(particles_flat[2, :])
     
     # Flattened array for timesteps
-    timesteps = np.tile(np.arange(n_tsteps), n_particles)
+    timesteps = np.repeat(np.arange(n_tsteps), n_particles)
 
     # Filter to valid particles & timesteps
-    valid_particles = particles_flat[valid_mask]
+    valid_particles = particles_flat[:, valid_mask]
     DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
     valid_timesteps = timesteps[valid_mask]
     DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
 
     # Obtain x and y coordinates and extract new field values
-    x_coords = valid_particles[:, 1].astype(int)
-    y_coords = valid_particles[:, 2].astype(int)
+    x_coords = valid_particles[1, :]
+    y_coords = valid_particles[2, :]
+    x_idx = (x_coords / 0.5 * 1000).astype(int)
+    y_idx = ((y_coords + 0.211) / 0.422 * 845).astype(int)
 
-    new_vals = np.full(particles_flat.shape[0], np.nan)
-    new_vals[valid_mask] = new_data[valid_timesteps, x_coords, y_coords]
+    new_vals = np.full(particles_flat.shape[1], np.nan)
+    new_vals[valid_mask] = new_data[valid_timesteps, x_idx, y_idx]
     new_vals = new_vals.reshape(n_tsteps, n_particles)
     # Concatenate to original data
     DEBUG("Concatenating new data to existing matrix")
@@ -68,7 +72,6 @@ def main():
 
     # Load particle tracking data; original dimensions (time, features, particles) = (3000, 3, 60000)
     particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_n20_fullsim_D1.5000000000000002e-05_nanUpstream.npy')
-    particle_matrix = particle_matrix
 
     # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
     f_name = 'E:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
@@ -85,27 +88,63 @@ def main():
     accel_x = np.gradient(u_data, axis=0)
 
     # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain and acceleration at that time step
-    particles_w_strain_acc = add_newfield_to_particles(particle_matrix, strain_data, field2=accel_x)
+    particles_w_strain = add_newfield_to_particles(particle_matrix, strain_data)
     # Data matrix is now: release time, x, y, strain, & acceleration at each time step
-    file_name = 'ignore/ParticleTrackingData/ParticleStrainsAccel_sim1_n20_t60_D1.5_v2.npy'
+    file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
     INFO(f"Saving expanded particle data to {file_name}.")
-    np.save(file_name, particles_w_strain_acc)
+    np.save(file_name, particles_w_strain)
     INFO("Save complete.")
 
-    # particles_w_strain_acc = np.load(file_name)
+    # Load expanded particle tracking data if already computed
+    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
+    # particles_w_strain = np.load(file_name)
 
     # PART 2: plotting and analyzing strain & acceleration along Lagrangian trajectories
 
-    # PLOT: many-line plot of strain as f(t) with 0 as release time
     # QC: spatial plot of strain vals at a few times
     plot_times = [100, 500, 1000, 2999]
     for t in plot_times:
-        plot_data = particles_w_strain_acc[t, :, :]
-        plt.scatter(plot_data[1, :], plot_data[2, :], c=plot_data[3, :], s=200)
+        plot_data = particles_w_strain[t, :, :]
+        plt.scatter(plot_data[1, :], plot_data[2, :], c=plot_data[3, :], s=100)
         plt.colorbar()
         plt.xlim(0, 0.5)
         plt.ylim(-0.211, 0.211)
         plt.show()
+
+    # PLOT: spatial plot of strain along trajectories for all time for particles 1-20
+    fig, ax = plt.subplots()
+    # release_time = particles_w_strain_acc[:, 0, :]
+    # print(release_time.shape)
+    # r_0 = release_time==0
+    # print(r_0.shape)
+    # plot_data = particles_w_strain_acc.transpose(1, 0, 2)
+    # plot_data = particles_w_strain_acc[:, :, (plot_data[0]==0)]
+    # plot_x = particles_w_strain_acc[:, , ]
+    # print(plot_data.shape)
+    # plt.scatter(plot_data[1, :], plot_data[2, :], c=plot_data[3, :], s=100)
+    for p in range(1500, 1520):
+        plt.scatter(particles_w_strain[:, 1, p], particles_w_strain[:, 2, p], c=particles_w_strain[:, 3, p], cmap=cmr.ember, s=50, alpha=0.5)
+        # print(particles_w_strain[:, 0, p])
+    plt.colorbar()
+    plt.xlim(0, 0.5)
+    plt.ylim(-0.211, 0.211)
+    plt.show()
+
+    # PLOT: many-line plot of strain as f(t) with 0 as release time
+    plt.close()
+    fig, ax = plt.subplots()
+    plot_data = particles_w_strain[:, 3, 1500]
+    plot_data = plot_data[~np.isnan(plot_data)]
+    plt.plot(plot_data)
+    plt.show()
+    # plt.plot(particles_w_strain_acc[:, 3, 1500])
+    # print(particles_w_strain_acc[:, 3, 1500])
+    # for p in range(1800, 1820):
+    #     plot_data = particles_w_strain[:, 3, p]
+    #     # time_vec = np.arange(0, 3000)
+    #     # strain_data = plot_data[~np.isnan(plot_data)]
+    #     ax.plot(plot_data)
+    # plt.show()
 
     # PLOT: many-line plot of acceleration as f(t) with 0 as release time
 
