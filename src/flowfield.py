@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.fft import fft, fftfreq
-from scipy.signal import stft
-
+import scipy.signal as sp
 
 class FlowField:
 
@@ -147,26 +146,84 @@ class FlowField:
                 # r_u = r_u[r_u.size//2:]        
                 
                 # u_freq = fft(u_fluct)
-                f, t, Zxx = stft(u_fluct, fs=0.02, nperseg=50, scaling='psd')
-                df, dt = f[1] - f[0], t[1] - t[0]
-                psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df
+                # f, t, Zxx = stft(u_fluct, fs=0.02, nperseg=50, scaling='psd')
+                # window = sp.windows.boxcar(50)
+                # hop = 25
+                fs = 50  # sampling frequency (Hz)
+                # scale_to = 'psd'
+                # SFT = sp.ShortTimeFFT(window, hop, fs=fs, scale_to = scale_to)
+                # Sx = SFT.stft(u_fluct)  # Perform the STFT
+
+                # f, Pxx_den = sp.periodogram(u_fluct, fs, scaling='density')
+                # freqs = np.linspace(0.001, 100, 10000)
+                ps = np.abs(np.fft.fft(u_fluct))**2
+                timestep = 1/50
+                freqs = np.fft.fftfreq(u_fluct.size, timestep)
+                idx = np.argsort(freqs)
+
+                ILS_guess = 0.015  # integral length scale, meters
+                # u_avg = np.mean(u_timeseries)  # average velocity, m/s 
+                u_avg = 0.10  # m/s
+                fL = freqs * ILS_guess / u_avg # normalized frequencies
+                vonkarman = (4*fL) / ((1 + 70.78*(fL**2))**(5/6)) 
+                # plt.semilogy(f, Pxx_den)
+                # plt.scatter(fL, Pxx_den * f / u_avg**2, label='modeled')
+                plt.plot(ps / fs * freqs / np.var(u_fluct)**2, label='modeled')
+                # plt.plot(freqs[idx], ps[idx] * freqs[idx] / np.var(u_fluct)**2, label='modeled')
+                plt.plot(vonkarman, color='r', label='Von Karman fit')
+                # plt.psd(u_timeseries, NFFT=150, Fs=fs, scale_by_freq=True, label='PSD')
+                plt.yscale('log')
+                plt.xscale('log')
+                # plt.xlim(0, 100)
+                # plt.ylim(10**(-10), 1)
+                plt.xlabel('normalized frequency (Hz)')
+                plt.ylabel('PSD [V**2/Hz]')
+                plt.legend()
+                plt.show()
+
+                # df, dt = f[1] - f[0], t[1] - t[0]
+                # psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df
                 # psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df * dt
                 # u_freq_power = np.square(fft(u_fluct))
                 # fft_list.append(u_freq)
                 
                 # QC: time series of u data
-                plt.close()
-                fig, ax = plt.subplots(figsize=(12, 5))
-                plt.plot(u_fluct)
-                plt.savefig('ignore/tests/stft_u_timeseries473.png', dpi=300)
+                # plt.close()
+                # fig, ax = plt.subplots(figsize=(12, 5))
+                # plt.plot(u_fluct)
+                # plt.savefig('ignore/tests/stft_u_timeseries473.png', dpi=300)
 
         # x_vals = np.linspace(0.0, N*T, N, endpoint=False)
         # x_freq = fftfreq(N, T)[:N//2]
 
-        if plot:
-            plt.close()
-            plt.plot(psd)
-            plt.savefig('ignore/tests/psd_test.png', dpi=300)
+        # if plot:
+
+        #     # TEST PLOT FROM SCIPY EXAMPLE
+        #     fig1, ax1 = plt.subplots(figsize=(6., 4.))  # enlarge plot a bit
+        #     t_lo, t_hi = SFT.extent(N)[:2]  # time range of plot
+        #     ax1.set(xlabel=f"Time $t$ in seconds ({SFT.p_num(N)} slices, " +
+        #                 rf"$\Delta t = {SFT.delta_t:g}\,$s)",
+        #             ylabel=f"Freq. $f$ in Hz ({SFT.f_pts} bins, " +
+        #                 rf"$\Delta f = {SFT.delta_f:g}\,$Hz)",
+        #             xlim=(t_lo, t_hi))
+
+        #     im1 = ax1.imshow(abs(Sx), origin='lower', aspect='auto',
+        #                     extent=SFT.extent(N), cmap='viridis')
+        #     # ax1.plot(t_x, f_i, 'r--', alpha=.5, label='$f_i(t)$')
+        #     fig1.colorbar(im1, label="Magnitude $|S_x(t, f)|$")
+
+        #     # Shade areas where window slices stick out to the side:
+        #     for t0_, t1_ in [(t_lo, SFT.lower_border_end[0] * SFT.T),
+        #                     (SFT.upper_border_begin(N)[0] * SFT.T, t_hi)]:
+        #         ax1.axvspan(t0_, t1_, color='w', linewidth=0, alpha=.2)
+        #     for t_ in [0, N * SFT.T]:  # mark signal borders with vertical line:
+        #         ax1.axvline(t_, color='y', linestyle='--', alpha=0.5)
+        #     ax1.legend()
+        #     fig1.tight_layout()
+        #     plt.show()
+            # plt.close()
+            # plt.plot(psd)
+            # plt.savefig('ignore/tests/psd_test.png', dpi=300)
 
             # plt.plot(x_freq, 2.0/N * np.abs(u_freq[:N//2]))
             # # plt.plot(x_freq, 2.0/N * np.abs(u_freq_power[:N//2]), alpha=0.5)
