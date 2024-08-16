@@ -63,15 +63,15 @@ class Simulation:
 
             # numerical advection & diffusion of all particles
             if method=='IE':
-                loc_out = self.flowfield.improvedEuler_singlestep(dt, tstep, loc_in) + np.sqrt(2 * D * dt) * rng.random(loc_in.shape)
+                loc_out = self.flowfield.improvedEuler_singlestep(dt, tstep, loc_in) + np.sqrt(2 * D * dt) * rng.normal(size=loc_in.shape)
             elif method=='RK4':
-                loc_out = self.flowfield.rk4singlestep(dt, tstep, loc_in) + np.sqrt(2 * D * dt) * rng.random(loc_in.shape)
+                loc_out = self.flowfield.rk4singlestep(dt, tstep, loc_in) + np.sqrt(2 * D * dt) * rng.normal(size=loc_in.shape)
 
             # save position of each particle after this step
             trajectories[step+1, 1:3, 0:end_idx] = loc_out
 
             # If particle has left the domain, set x and y position to Nan
-            mask = ((trajectories[step+1, 1, :] > 0.5) | (trajectories[step+1, 1, :] < 0) | (trajectories[step+1, 2, :] > 0.211) | (trajectories[step+1, 2, :] < -0.211))
+            mask = ((trajectories[step+1, 1, :] > 0.75) | (trajectories[step+1, 1, :] < 0) | (trajectories[step+1, 2, :] > 0.3) | (trajectories[step+1, 2, :] < -0.3))
             trajectories[step+1, 1:3, mask] = np.nan
             
             # shift indices to include next batch of particles starting at (0, 0)
@@ -112,8 +112,8 @@ class Simulation:
                 plt.close()
                 fig, ax = plt.subplots()
                 plt.scatter(self.trajectories[frame, 1, :], self.trajectories[frame, 2, :])
-                plt.xlim(0, 0.5)
-                plt.ylim(-0.211, 0.211)
+                plt.xlim(0, 0.75)
+                plt.ylim(-0.3, 0.3)
                 f_name = filepath + f'_frame{frame}.png'
                 plt.savefig(f_name, dpi=dpi)
 

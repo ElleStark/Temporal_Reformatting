@@ -1,6 +1,7 @@
 # FlowField class
 # Elle Stark May 2024
 
+import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -9,13 +10,15 @@ import scipy.signal as sp
 
 class FlowField:
 
-    def __init__(self, xmesh, ymesh, u_data, v_data, xmesh_uv, ymesh_uv, dt_uv):
+    def __init__(self, xmesh, ymesh, xmesh_uv, ymesh_uv, dt_uv, xlim, ylim):
         super().__init__()
 
         self.x = xmesh
         self.y = ymesh
-        self.u_data = u_data
-        self.v_data = v_data
+        # self.u_data = u_data
+        # self.v_data = v_data
+        self.xlims = xlim
+        self.ylims = ylim
         self.xmesh_uv = xmesh_uv
         self.ymesh_uv = ymesh_uv
         self.dt_uv = dt_uv
@@ -70,18 +73,24 @@ class FlowField:
         # vector of x values
         xmesh_vec = self.xmesh_uv[0, :]
 
+        # read in u and v data from h5
+        f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
+        with h5py.File(f_name, 'r') as f:
+            u_data = f.get('Flow Data/u')[frame, self.xlims, self.ylims].T
+            v_data = f.get('Flow Data/v')[frame, self.xlims, self.ylims].T
+
         # Set up interpolation functions
         # can use cubic interpolation for continuity of the between the segments (improve smoothness)
         # set bounds_error=False to allow particles to go outside the domain by extrapolation
         if flipuv: 
             # axes must be in ascending order, so need to flip y-axis, which also means flipping u and v upside-down
             ymesh_vec = np.flipud(self.ymesh_uv)[:, 0]
-            u_matrix = np.squeeze(np.flipud(self.u_data[:, :, frame]))
-            v_matrix = np.squeeze(np.flipud(self.v_data[:, :, frame]))
+            u_matrix = np.squeeze(np.flipud(u_data))
+            v_matrix = np.squeeze(np.flipud(v_data))
         else: 
             ymesh_vec = self.ymesh_uv[0, :]
-            u_matrix = np.squeeze(self.u_data[:, :, frame])
-            v_matrix = np.squeeze(self.v_data[:, :, frame])
+            u_matrix = np.squeeze(u_data)
+            v_matrix = np.squeeze(v_data)
 
         u_interp = RegularGridInterpolator((ymesh_vec, xmesh_vec), u_matrix,
                                            method='linear', bounds_error=False, fill_value=None)
