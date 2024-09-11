@@ -1,7 +1,9 @@
 # Script to compute instantaneous strains along particle trajectories (generated in main_ParticleTrack.py)
 # Elle Stark, June 2024
 import h5py
+from itertools import combinations
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import logging
@@ -149,7 +151,7 @@ def main():
     # extract release times and cumulative strain from particle matrix
     release_times = particles_w_strain[0, 0, :].round(2)
     release_idxs = (release_times / dt).astype(int)
-    travel_times = first_detect_idxs - release_idxs
+    travel_times = (first_detect_idxs - release_idxs) * dt
 
     # average strain from release time to first detection for each detected particle
     # First, create a mask to select the appropriate slices for each particle
@@ -167,42 +169,57 @@ def main():
     traj_x_prev = np.roll(traj_coords_x, 1, axis=0)
     traj_coords_y = np.where(bool_mask[:, :], particles_w_strain[:, 2, :], np.nan)
     traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
-    traj_length = np.nansum((np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
+    traj_length = np.nansum(1000*(np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
     strains_distavg = cum_strains / traj_length
+
+    # Compute average speed of particles
+    speed = traj_length / travel_times  # mm/sec
 
     # Create mask for detected particles based on detect time not equal to zero
     detected_idxs = np.where(first_detect_idxs != 0, True, False)
   
     # Dataframe of detected particles
-    particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_idxs[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
-                                'Travel_t': travel_times[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
+    particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
+                                'Travel_t': travel_times[detected_idxs], 'travel_dist': traj_length[detected_idxs], 'avg_speed': speed[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 
+                                'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
 
-    particles_df.plot(x='Travel_t', y='dist_avg_strain', style='o')
-    plt.ylabel('Cumulative max principal strain / trajectory length')
-    plt.xlabel('Travel time (s)')
-    plt.title('Max P Strain per trajectory distance vs travel time')
-    plt.show()
     
-    # np.save('ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy')  # Matrix now has an additional 'sensor detection' column
+    # particles_df.plot(x='Travel_t', y='Release_t', style='o')
+    # plt.ylabel('Release time')
+    # plt.xlabel('Travel time')
+    # plt.title('travel time v release time')
+    # plt.show()
+    
+    # Find pairs of jointly detected particles (same Detect_t; at least 2)
+    joint_detect_particles = particles_df[particles_df.duplicated('Detect_t', keep=False) == True]
 
-    # PLOT avg strain vs travel time
+    # Self-merge dataframe with itself then use filtering to create dataframe with all possible combinations of particle pairs
+    merged_df = joint_detect_particles.merge(joint_detect_particles, on='Detect_t', suffixes=('_1', '_2'))
+    merged_df = merged_df[merged_df['Particle_ID_1'] != merged_df['Particle_ID_2']]
+    merged_df = merged_df[merged_df['Particle_ID_1'] < merged_df['Particle_ID_2']]
+
+    # Create unique pair_ID
+    merged_df['Pair_ID'] = merged_df['Particle_ID_1'].astype(str) + '_' + merged_df['Particle_ID_2'].astype(str)
+
+    # Compute differences in travel times, release times, strains
+    merged_df['delta_travel'] = abs(merged_df['Travel_t_1'] - merged_df['Travel_t_2'])
+    merged_df['delta_release'] = abs(merged_df['Release_t_1'] - merged_df['Release_t_2'])
+    merged_df['delta_t_avg_strain'] = abs(merged_df['t_avg_strain_1'] - merged_df['t_avg_strain_2'])
+    merged_df['delta_d_avg_strain'] = abs(merged_df['dist_avg_strain_1'] - merged_df['dist_avg_strain_2'])
+    merged_df['delta_sum_strain'] = abs(merged_df['cumulative_strain_1'] - merged_df['cumulative_strain_2'])
+    # merged_df['delta_detect_t'] = abs(merged_df['Detect_t_1'] - merged_df['Detect_t_2'])
+
+    particle_pair_df = merged_df[['Pair_ID', 'Detect_t', 'delta_travel', 'delta_release', 'delta_t_avg_strain', 'delta_d_avg_strain', 'delta_sum_strain']]
+
+    plt.close()
+    particle_pair_df.plot.scatter(x='delta_travel', y='delta_release', style='o')
+    plt.xlabel('difference in travel time')
+    plt.ylabel('difference in release time')
+    plt.title('Jointly detected particles: difference release time vs difference in travel time')
+    plt.show()
 
 
 
-    # Find detected particles
-
-
-    # Travel time of detected particles
-
-
-    # Cumulative strain of detected particles
-
-
-    # Plot strain vs travel time of detected particles
-
-
-
-    # Find pairs of jointly detected particles & compute rate of separation
 
 
     # PART 2: plotting and analyzing strain & acceleration along Lagrangian trajectories
