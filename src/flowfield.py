@@ -74,7 +74,7 @@ class FlowField:
         xmesh_vec = self.xmesh_uv[0, :]
 
         # read in u and v data from h5
-        f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
+        f_name = 'D:/singlesource_2d_extended/180to360/Re100_0_5mm_50Hz_singlesource_2d_180to360s.h5'
         with h5py.File(f_name, 'r') as f:
             u_data = f.get('Flow Data/u')[frame, self.xlims, self.ylims].T
             v_data = f.get('Flow Data/v')[frame, self.xlims, self.ylims].T

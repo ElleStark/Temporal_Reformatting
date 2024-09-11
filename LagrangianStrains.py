@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import logging
+import pandas as pd
 import time
 import cmasher as cmr
 
@@ -75,12 +76,16 @@ def main():
     # # Load particle tracking data; original dimensions (time, features, particles) = (3000, 3, 60000)
     # particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_n20_fullsim_D1.5000000000000002e-05_nanUpstream.npy')
 
-    # # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
-    # f_name = 'E:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
-    # with h5py.File(f_name, 'r') as f:
-    #     # Numeric grids; original dimensions (x, y) = (1001, 846)
-    #     x_grid = f.get('Model Metadata/xGrid')[:]
-    #     y_grid = f.get('Model Metadata/yGrid')[:]
+    # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
+    f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
+    with h5py.File(f_name, 'r') as f:
+        # Numeric grids; original dimensions (x, y) = (1001, 846)
+        x_grid = f.get('Model Metadata/xGrid')[:]
+        y_grid = f.get('Model Metadata/yGrid')[:]
+
+        dx = f.get('Model Metadata/spatialResolution')[0].item()
+        freq = f.get('Model Metadata/timeResolution')[0].item()
+        dt = 1 / freq  # convert from Hz to seconds
 
     #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (3000, 1001, 846)
     #     strain_data = f.get('Flow Data/Strains/max_p_strains')[:]
@@ -100,46 +105,145 @@ def main():
     ################ END PART 1 ###################
 
     # Load expanded particle tracking data if already computed
+    # Numpy file columns (in this order): release time, x, y, strain (at each time step) = (3000, 4, 60000)
     file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
     particles_w_strain = np.load(file_name)
+    n_tsteps, n_features, n_particles = particles_w_strain.shape
+
+    # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
+    det_x = 0.45  # downstream detector distance (m)
+    det_y = 0  # cross-stream detector position (m, center of detector)
+    det_width = 0.01  # detector width, streamwise (m)
+    det_height = 0.0465  # detector height, cross-stream (m)
+
+    # Flatten and mask particle data
+    particles_reorder = particles_w_strain.transpose(1, 0, 2)
+    particles_flat = particles_reorder.reshape(n_features, n_tsteps * n_particles)
+    valid_mask = ~np.isnan(particles_flat[1, :]) & ~np.isnan(particles_flat[2, :])
+    
+    # Flattened array for timesteps
+    timesteps = np.repeat(np.arange(n_tsteps), n_particles)
+
+    # Filter to valid particles & timesteps
+    valid_particles = particles_flat[:, valid_mask]
+    DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
+    valid_timesteps = timesteps[valid_mask]
+    DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
+
+    # Obtain x and y coordinates and extract new field values
+    x_coords = valid_particles[1, :]
+    y_coords = valid_particles[2, :]
+
+    # Define conditions for sensor detection
+    det_condition = ((det_x <= x_coords) & (x_coords <= (det_x + det_width))) & (((det_y - det_height / 2) <= y_coords) & (y_coords <= (det_y + det_height / 2)))
+
+    cond_array = np.full(particles_flat.shape[1], False)
+    cond_array[valid_mask] = np.where(det_condition, det_condition, False)
+    cond_array = cond_array.reshape(n_tsteps, n_particles).T  # Now 60000 x 3000 array of T/F, or NAN
+    # first_detect = np.zeros_like(cond_array, dtype=bool)
+    # first_detect_time = np.arange(len(cond_array)), cond_array.argmax(axis=1)
+    first_detect_idxs = cond_array.argmax(axis=1)
+
+    # Vector of particle id numbers
+    particle_ids = np.linspace(0, n_particles-1, n_particles, dtype=int)
+    # extract release times and cumulative strain from particle matrix
+    release_times = particles_w_strain[0, 0, :].round(2)
+    release_idxs = (release_times / dt).astype(int)
+    travel_times = first_detect_idxs - release_idxs
+
+    # average strain from release time to first detection for each detected particle
+    # First, create a mask to select the appropriate slices for each particle
+    mask = np.arange(particles_w_strain.shape[0])[:, np.newaxis]  # shape (timesteps, 1)
+    # Create a boolean mask for each particle's range
+    bool_mask = (mask >= release_idxs) & (mask < first_detect_idxs)
+    # Calculate the average strain across the valid range for each particle
+    strains = np.where(bool_mask[:, :], particles_w_strain[:, 3, :], np.nan)
+    # Now compute the mean along the time dimension, ignoring the NaNs
+    avg_strains = np.nanmean(strains, axis=0)
+    cum_strains = np.nansum(strains, axis=0)
+
+    # Compute length of trajectories
+    traj_coords_x = np.where(bool_mask[:, :], particles_w_strain[:, 1, :], np.nan)
+    traj_x_prev = np.roll(traj_coords_x, 1, axis=0)
+    traj_coords_y = np.where(bool_mask[:, :], particles_w_strain[:, 2, :], np.nan)
+    traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
+    traj_length = np.nansum((np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
+    strains_distavg = cum_strains / traj_length
+
+    # Create mask for detected particles based on detect time not equal to zero
+    detected_idxs = np.where(first_detect_idxs != 0, True, False)
+  
+    # Dataframe of detected particles
+    particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_idxs[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
+                                'Travel_t': travel_times[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
+
+    particles_df.plot(x='Travel_t', y='dist_avg_strain', style='o')
+    plt.ylabel('Cumulative max principal strain / trajectory length')
+    plt.xlabel('Travel time (s)')
+    plt.title('Max P Strain per trajectory distance vs travel time')
+    plt.show()
+    
+    # np.save('ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy')  # Matrix now has an additional 'sensor detection' column
+
+    # PLOT avg strain vs travel time
+
+
+
+    # Find detected particles
+
+
+    # Travel time of detected particles
+
+
+    # Cumulative strain of detected particles
+
+
+    # Plot strain vs travel time of detected particles
+
+
+
+    # Find pairs of jointly detected particles & compute rate of separation
+
 
     # PART 2: plotting and analyzing strain & acceleration along Lagrangian trajectories
+    xlim = [0, 0.5]
+    ylim = [-0.211, 0.211]
 
-    # QC: spatial plot of strain vals at a few times
+    # # QC: spatial plot of strain vals at a few times
     # plot_times = [100, 500, 1000, 2999]
     # for t in plot_times:
     #     plot_data = particles_w_strain[t, :, :]
     #     plt.scatter(plot_data[1, :], plot_data[2, :], c=plot_data[3, :], s=100)
     #     plt.colorbar()
-    #     plt.xlim(0, 0.5)
-    #     plt.ylim(-0.211, 0.211)
+    #     plt.xlim(xlim[0], xlim[1])
+    #     plt.ylim(ylim[0], ylim[1])
     #     plt.show()
 
-    # PLOT: spatial plot of strain along trajectories for all time for particles 1-20
-    fig, ax = plt.subplots()
-    startidx = 2100
-    endidx = 2120
-    for p in range(startidx, endidx):
-        plt.scatter(particles_w_strain[:, 1, p], particles_w_strain[:, 2, p], c=particles_w_strain[:, 3, p], cmap=cmr.ember, 
-                    norm=colors.LogNorm(), s=25, alpha=0.5)
-    plt.colorbar()
-    plt.xlim(0, 0.5)
-    plt.ylim(-0.211, 0.211)
-    plt.title(f'Strain along trajectories, release time {round(particles_w_strain[0, 0, startidx], 2)} s')
-    plt.show()
+    # # PLOT: spatial plot of strain along trajectories for all time for particles 1-20
+    # fig, ax = plt.subplots()
+    # startidx = 2100
+    # endidx = 2120
+    # for p in range(startidx, endidx):
+    #     plt.scatter(particles_w_strain[:, 1, p], particles_w_strain[:, 2, p], c=particles_w_strain[:, 3, p], cmap=cmr.ember, 
+    #                 norm=colors.LogNorm(), s=25, alpha=0.5)
+    # plt.colorbar()
+    # plt.xlim(xlim[0], xlim[1])
+    # plt.ylim(ylim[0], ylim[1])
+    # plt.title(f'Strain along trajectories, release time {round(particles_w_strain[0, 0, startidx], 2)} s')
+    # plt.show()
 
-    # PLOT: many-line plot of strain as f(t) with 0 as release time
-    plt.close()
-    fig, ax = plt.subplots(figsize=(8, 4))
-    for p in range(startidx, endidx):
-        plot_data = particles_w_strain[:, 3, p]
-        plot_data = plot_data[~np.isnan(plot_data)]
-        plt.plot(plot_data)
-    plt.ylim(0, 15)
-    plt.xlim(0, 250)
-    plt.ylabel('max principal strain')
-    plt.xlabel('timesteps from release')
-    plt.show()
+    # # PLOT: many-line plot of strain as f(t) with 0 as release time
+    # plt.close()
+    # fig, ax = plt.subplots(figsize=(8, 4))
+    # for p in range(startidx, endidx):
+    #     plot_data = particles_w_strain[:, 3, p]
+    #     plot_data = plot_data[~np.isnan(plot_data)]
+    #     plt.plot(plot_data)
+    # plt.ylim(0, 15)
+    # plt.xlim(0, 250)
+    # plt.ylabel('max principal strain')
+    # plt.xlabel('timesteps from release')
+    # plt.show()
 
     # PLOT: ILS line plots of slice at x=0, x=0.025, x=0.05 m
     # file_path = 'C:/Users/elles/Documents/CU_Boulder/Fluids_Research/FisherPlume_plots/flow_stats_plots/ignore/ILS_ustreamwise.npy'

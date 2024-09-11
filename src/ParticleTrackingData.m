@@ -4,18 +4,40 @@
 
 cd('C:/Users/elles/Documents/CU_Boulder/Fluids_Research/TemporalReformatting/Code/TwoParticleSims_TempReform/')
 
-sim1data = load('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_0to60s_D1.5_nanUpstream.mat');
-sim2data = load('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_60to120s_D1.5_nanUpstream.mat');
-sim3data = load('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_120to180s_D1.5_nanUpstream.mat');
+filedata = load('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D1.5.mat');
+simdata = filedata.data;
 
-% sim1matrix = sim1data.data(:);
-% sim2matrix = sim2data.data(:);
-% sim3matrix = sim3data.data(:);
+ParticleTracking = struct;
+ParticleTracking.data = simdata;
+metadata = struct;
+params = struct;
+siminfo = struct;
+fileinfo = struct;
 
-% ParticleTracking(1) = sim1data;
-% ParticleTracking(2) = sim2data;
-% ParticleTracking(3) = sim3data;
+params.num_particles = '20 seeded each frame';
+params.num_frames = '9000';
+params.dt = '0.02 sec';
+params.duration = '180 sec';
+params.diffusionCoefficient = '1.5e-05 m^2/s';
+params.gridResolution = '0.0005 meter';
+params.ParticleReleasePoint = '(0,0)';
+params.NumericalAdvectionMethod = 'ImprovedEuler';
 
-combined_data = [sim1data.data(:, :, :); sim2data.data(:, :, :); sim3data.data(:, :, :)];
-save('ExtendedSim_0to180sec_ParticleTracking_n20_D1.5.mat', 'combined_data', '-v7.3')
+siminfo.description = '2D grid turbulence Comsol model';
+siminfo.source = 'Expanded domain of Tootoonian et al., 2024 simulations';
+siminfo.meanVelocity = '10 cm/s';
+siminfo.xDomain = '[0, 0.75] meters';
+siminfo.yDomain = '[-0.3, 0.3] meters';
+
+fileinfo.creationDate = 'Aug 2024';
+fileinfo.createdBy = 'Elle Stark, EFD Lab, CU Boulder CEAE Dept';
+fileinfo.contact = 'elle.stark@colorado.edu or aaron.true@colorado.edu';
+
+metadata.ParticleTrackingParams = params;
+metadata.FlowfieldSimulationInfo = siminfo;
+metadata.FileCreationInfo = fileinfo;
+
+ParticleTracking.meta = metadata;
+
+save('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D1.5_wMeta.mat', 'ParticleTracking', '-v7.3')
 
