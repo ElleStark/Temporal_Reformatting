@@ -163,6 +163,7 @@ def main():
     # Now compute the mean along the time dimension, ignoring the NaNs
     avg_strains = np.nanmean(strains, axis=0)
     cum_strains = np.nansum(strains, axis=0)
+    max_strains = np.nanmax(strains, axis=0)
 
     # Compute length of trajectories
     traj_coords_x = np.where(bool_mask[:, :], particles_w_strain[:, 1, :], np.nan)
@@ -181,14 +182,14 @@ def main():
     # Dataframe of detected particles
     particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
                                 'Travel_t': travel_times[detected_idxs], 'travel_dist': traj_length[detected_idxs], 'avg_speed': speed[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 
-                                'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
+                                'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs], 'max_strain': max_strains[detected_idxs]})
 
     
-    # particles_df.plot(x='Travel_t', y='Release_t', style='o')
-    # plt.ylabel('Release time')
-    # plt.xlabel('Travel time')
-    # plt.title('travel time v release time')
-    # plt.show()
+    particles_df.plot(x='Travel_t', y='max_strain', style='o')
+    plt.ylabel('Maximum strain')
+    plt.xlabel('Travel time')
+    plt.title('max strain v travel time')
+    plt.show()
     
     # Find pairs of jointly detected particles (same Detect_t; at least 2)
     joint_detect_particles = particles_df[particles_df.duplicated('Detect_t', keep=False) == True]
@@ -210,12 +211,14 @@ def main():
     # merged_df['delta_detect_t'] = abs(merged_df['Detect_t_1'] - merged_df['Detect_t_2'])
 
     particle_pair_df = merged_df[['Pair_ID', 'Detect_t', 'delta_travel', 'delta_release', 'delta_t_avg_strain', 'delta_d_avg_strain', 'delta_sum_strain']]
+    particle_pair_samefreq = particle_pair_df.loc[particle_pair_df['delta_release']==0]
+    particle_pair_difffreq = particle_pair_df.loc[particle_pair_df['delta_release'] > 0]
 
     plt.close()
-    particle_pair_df.plot.scatter(x='delta_travel', y='delta_release', style='o')
+    particle_pair_difffreq.plot.scatter(x='delta_travel', y='delta_sum_strain', style='o')
     plt.xlabel('difference in travel time')
-    plt.ylabel('difference in release time')
-    plt.title('Jointly detected particles: difference release time vs difference in travel time')
+    plt.ylabel('difference in cumulative strain')
+    plt.title('Jointly detected particles: difference cumulative strain vs difference in travel time')
     plt.show()
 
 
