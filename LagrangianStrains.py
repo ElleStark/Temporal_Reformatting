@@ -79,37 +79,40 @@ def main():
     # particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_n20_fullsim_D1.5000000000000002e-05_nanUpstream.npy')
 
     # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
-    f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
+    # f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
+    f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
     with h5py.File(f_name, 'r') as f:
-        # Numeric grids; original dimensions (x, y) = (1001, 846)
+        # Numeric grids; original dimensions (x, y) = (1501, 1201)
         x_grid = f.get('Model Metadata/xGrid')[:]
         y_grid = f.get('Model Metadata/yGrid')[:]
 
         dx = f.get('Model Metadata/spatialResolution')[0].item()
         freq = f.get('Model Metadata/timeResolution')[0].item()
         dt = 1 / freq  # convert from Hz to seconds
-
-    #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (3000, 1001, 846)
-    #     strain_data = f.get('Flow Data/Strains/max_p_strains')[:]
+    
+    f_name = 'D:/singlesource_2d_extended/FTLE_extendedsim_180s.h5'
+    with h5py.File(f_name, 'r') as f:
+    #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (9001, 1201, 1501)
+        strain_data = f.get('maxPstrain')[:]
     #     u_data = f.get('Flow Data/u')[:-1, :, :]  # Remove final(?) timestep to match particle tracking & strain data
 
     # # Compute streamwise acceleration at all timesteps
     # accel_x = np.gradient(u_data, axis=0)
 
-    # # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain and acceleration at that time step
-    # particles_w_strain = add_newfield_to_particles(particle_matrix, strain_data)
-    # # Data matrix is now: release time, x, y, strain, & acceleration at each time step
-    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
-    # INFO(f"Saving expanded particle data to {file_name}.")
-    # np.save(file_name, particles_w_strain)
-    # INFO("Save complete.")
+    # # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain at that time step
+    particles_w_strain = add_newfield_to_particles(particle_matrix, strain_data)
+    # Data matrix is now: release time, x, y, strain, at each time step
+    file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t60_D1.5v5.npy'
+    INFO(f"Saving expanded particle data to {file_name}.")
+    np.save(file_name, particles_w_strain)
+    INFO("Save complete.")
 
     ################ END PART 1 ###################
 
     # Load expanded particle tracking data if already computed
     # Numpy file columns (in this order): release time, x, y, strain (at each time step) = (3000, 4, 60000)
-    file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
-    particles_w_strain = np.load(file_name)
+    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
+    # particles_w_strain = np.load(file_name)
     n_tsteps, n_features, n_particles = particles_w_strain.shape
 
     # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
