@@ -21,33 +21,42 @@ INFO = logger.info
 WARN = logger.warn
 DEBUG = logger.debug
 
-def add_newfield_to_particles(particle_data, new_data, field2=None):
+# def add_newfield_to_particles(particle_data, new_data, field2=None):
+def add_newfield_to_particles(particle_data, field2=None):
     INFO("Begin function to add new fields")
     n_tsteps, n_features, n_particles = particle_data.shape
     DEBUG(f"number of particles={n_particles}, number of features={n_features}, number of timesteps={n_tsteps}")
     
     # Flatten and mask particle data
-    particles_reorder = particle_data.transpose(1, 0, 2)
-    particles_flat = particles_reorder.reshape(n_features, n_tsteps * n_particles)
-    valid_mask = ~np.isnan(particles_flat[1, :]) & ~np.isnan(particles_flat[2, :])
+    valid_particles = particle_data.transpose(1, 0, 2)
+    valid_particles = valid_particles.reshape(n_features, n_tsteps * n_particles)
+    valid_mask = ~np.isnan(valid_particles[1, :]) & ~np.isnan(valid_particles[2, :])
     
     # Flattened array for timesteps
-    timesteps = np.repeat(np.arange(n_tsteps), n_particles)
+    valid_timesteps = np.repeat(np.arange(n_tsteps), n_particles)
 
     # Filter to valid particles & timesteps
-    valid_particles = particles_flat[:, valid_mask]
+    valid_particles = valid_particles[:, valid_mask]
     DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
-    valid_timesteps = timesteps[valid_mask]
+    valid_timesteps = valid_timesteps[valid_mask]
     DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
 
     # Obtain x and y coordinates and extract new field values
-    x_coords = valid_particles[1, :]
-    y_coords = valid_particles[2, :]
-    x_idx = (x_coords / 0.5 * 1000).astype(int)
-    y_idx = ((y_coords + 0.211) / 0.422 * 845).astype(int)
+    x_idx = valid_particles[1, :]
+    y_idx = valid_particles[2, :]
+    x_idx = (x_idx / 0.75 * 1500).astype(int)
+    y_idx = ((y_idx + 0.3) / 0.6 * 1200).astype(int)
 
-    new_vals = np.full(particles_flat.shape[1], np.nan)
-    new_vals[valid_mask] = new_data[valid_timesteps, x_idx, y_idx]
+    new_vals = np.full(n_tsteps * n_particles, np.nan)
+    # new_vals[valid_mask] = new_data[valid_timesteps, x_idx, y_idx]
+    f_name = 'D:/singlesource_2d_extended/FTLE_extendedsim_180s.h5'
+    with h5py.File(f_name, 'r') as f:
+    #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (9001, 1201, 1501)
+        new_data = f.get('maxPstrain')[:, :, :]
+    
+    DEBUG(f"strain data dimensions: {new_data.shape}")
+    new_vals[valid_mask] = new_data[valid_timesteps, y_idx, x_idx]
+    DEBUG(f"Filtered strain data dimensions: {new_data.shape}")
     new_vals = new_vals.reshape(n_tsteps, n_particles)
     # Concatenate to original data
     DEBUG("Concatenating new data to existing matrix")
@@ -58,15 +67,15 @@ def add_newfield_to_particles(particle_data, new_data, field2=None):
     if field2 is None:
         INFO("1 New field added to particle data.")
     
-    else:
-        new_vals2 = np.full(particles_flat.shape[0], np.nan)
-        new_vals2[valid_mask] = field2[valid_timesteps, x_coords, y_coords]
-        new_vals2 = new_vals2.reshape(n_tsteps, n_particles)
-        DEBUG("Concatenating new data field 2 to existing matrix")
-        start = time.time()
-        particle_data_expanded = np.concatenate((particle_data_expanded, new_vals2[:, np.newaxis, :]), axis=1)
-        DEBUG(f"Concatenation 2 completed in {round(time.time()-start, 2)} sec.")
-        INFO("2 new fields added to particle data.")
+    # else:
+    #     new_vals2 = np.full(particles_flat.shape[0], np.nan)
+    #     new_vals2[valid_mask] = field2[valid_timesteps, x_coords, y_coords]
+    #     new_vals2 = new_vals2.reshape(n_tsteps, n_particles)
+    #     DEBUG("Concatenating new data field 2 to existing matrix")
+    #     start = time.time()
+    #     particle_data_expanded = np.concatenate((particle_data_expanded, new_vals2[:, np.newaxis, :]), axis=1)
+    #     DEBUG(f"Concatenation 2 completed in {round(time.time()-start, 2)} sec.")
+    #     INFO("2 new fields added to particle data.")
 
     return particle_data_expanded
 
@@ -75,45 +84,47 @@ def main():
     
     ########## PART 1: Extract particle tracking data and add strain and acceleration data, if needed
 
-    # # Load particle tracking data; original dimensions (time, features, particles) = (3000, 3, 60000)
-    # particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_n20_fullsim_D1.5000000000000002e-05_nanUpstream.npy')
+    # Load particle tracking data; original dimensions (time, features, particles) = (9001, 3, 180000)
+    # particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
+    # particle_matrix = particle_matrix[:3001, :, :60000]
 
-    # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
-    # f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
-    f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
-    with h5py.File(f_name, 'r') as f:
-        # Numeric grids; original dimensions (x, y) = (1501, 1201)
-        x_grid = f.get('Model Metadata/xGrid')[:]
-        y_grid = f.get('Model Metadata/yGrid')[:]
+    # # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
+    # # f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
+    # f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
+    # with h5py.File(f_name, 'r') as f:
+    #     # Numeric grids; original dimensions (x, y) = (1501, 1201)
+    #     # x_grid = f.get('Model Metadata/xGrid')[:]
+    #     # y_grid = f.get('Model Metadata/yGrid')[:]
 
-        dx = f.get('Model Metadata/spatialResolution')[0].item()
-        freq = f.get('Model Metadata/timeResolution')[0].item()
-        dt = 1 / freq  # convert from Hz to seconds
+    #     # dx = f.get('Model Metadata/spatialResolution')[0].item()
+    #     freq = f.get('Model Metadata/timeResolution')[0].item()
+    #     dt = 1 / freq  # convert from Hz to seconds
     
-    f_name = 'D:/singlesource_2d_extended/FTLE_extendedsim_180s.h5'
-    with h5py.File(f_name, 'r') as f:
-    #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (9001, 1201, 1501)
-        strain_data = f.get('maxPstrain')[:]
-    #     u_data = f.get('Flow Data/u')[:-1, :, :]  # Remove final(?) timestep to match particle tracking & strain data
+    # # f_name = 'D:/singlesource_2d_extended/FTLE_extendedsim_180s.h5'
+    # # with h5py.File(f_name, 'r') as f:
+    # # #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (9001, 1201, 1501)
+    # #     strain_data = f.get('maxPstrain')[:]
+    # # #     u_data = f.get('Flow Data/u')[:-1, :, :]  # Remove final(?) timestep to match particle tracking & strain data
 
-    # # Compute streamwise acceleration at all timesteps
-    # accel_x = np.gradient(u_data, axis=0)
+    # # # Compute streamwise acceleration at all timesteps
+    # # accel_x = np.gradient(u_data, axis=0)
 
-    # # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain at that time step
-    particles_w_strain = add_newfield_to_particles(particle_matrix, strain_data)
-    # Data matrix is now: release time, x, y, strain, at each time step
-    file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t60_D1.5v5.npy'
-    INFO(f"Saving expanded particle data to {file_name}.")
-    np.save(file_name, particles_w_strain)
-    INFO("Save complete.")
+    # # # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain at that time step
+    # particles_w_strain = add_newfield_to_particles(particle_matrix)
+    # # Data matrix is now: release time, x, y, strain, at each time step
+    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t0to180_D1.5.npy'
+    # INFO(f"Saving expanded particle data to {file_name}.")
+    # np.save(file_name, particles_w_strain)
+    # INFO("Save complete.")
 
     ################ END PART 1 ###################
 
     # Load expanded particle tracking data if already computed
-    # Numpy file columns (in this order): release time, x, y, strain (at each time step) = (3000, 4, 60000)
-    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_sim1_n20_t60_D1.5v5.npy'
-    # particles_w_strain = np.load(file_name)
+    # Numpy file columns (in this order): release time, x, y, strain (at each time step) = (9001, 4, 180000)
+    file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t0to180_D1.5.npy'
+    particles_w_strain = np.load(file_name)
     n_tsteps, n_features, n_particles = particles_w_strain.shape
+    dt = 0.02
 
     # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
     det_x = 0.45  # downstream detector distance (m)
@@ -122,17 +133,19 @@ def main():
     det_height = 0.0465  # detector height, cross-stream (m)
 
     # Flatten and mask particle data
-    particles_reorder = particles_w_strain.transpose(1, 0, 2)
-    particles_flat = particles_reorder.reshape(n_features, n_tsteps * n_particles)
+    particles_flat = particles_w_strain.transpose(1, 0, 2)
+    particles_flat = particles_flat.reshape(n_features, n_tsteps * n_particles)
     valid_mask = ~np.isnan(particles_flat[1, :]) & ~np.isnan(particles_flat[2, :])
     
     # Flattened array for timesteps
-    timesteps = np.repeat(np.arange(n_tsteps), n_particles)
+    valid_timesteps = np.repeat(np.arange(n_tsteps), n_particles)
 
     # Filter to valid particles & timesteps
     valid_particles = particles_flat[:, valid_mask]
+    # DELETE particles_flat 
+    del particles_flat
     DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
-    valid_timesteps = timesteps[valid_mask]
+    valid_timesteps = valid_timesteps[valid_mask]
     DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
 
     # Obtain x and y coordinates and extract new field values
@@ -142,7 +155,7 @@ def main():
     # Define conditions for sensor detection
     det_condition = ((det_x <= x_coords) & (x_coords <= (det_x + det_width))) & (((det_y - det_height / 2) <= y_coords) & (y_coords <= (det_y + det_height / 2)))
 
-    cond_array = np.full(particles_flat.shape[1], False)
+    cond_array = np.full(n_tsteps * n_particles, False)
     cond_array[valid_mask] = np.where(det_condition, det_condition, False)
     cond_array = cond_array.reshape(n_tsteps, n_particles).T  # Now 60000 x 3000 array of T/F, or NAN
     # first_detect = np.zeros_like(cond_array, dtype=bool)
@@ -153,14 +166,14 @@ def main():
     particle_ids = np.linspace(0, n_particles-1, n_particles, dtype=int)
     # extract release times and cumulative strain from particle matrix
     release_times = particles_w_strain[0, 0, :].round(2)
-    release_idxs = (release_times / dt).astype(int)
-    travel_times = (first_detect_idxs - release_idxs) * dt
+    # release_idxs = ((release_times / dt).astype(int))
+    travel_times = (first_detect_idxs - ((release_times / dt).astype(int))) * dt
 
     # average strain from release time to first detection for each detected particle
     # First, create a mask to select the appropriate slices for each particle
     mask = np.arange(particles_w_strain.shape[0])[:, np.newaxis]  # shape (timesteps, 1)
     # Create a boolean mask for each particle's range
-    bool_mask = (mask >= release_idxs) & (mask < first_detect_idxs)
+    bool_mask = (mask >= ((release_times / dt).astype(int))) & (mask < first_detect_idxs)
     # Calculate the average strain across the valid range for each particle
     strains = np.where(bool_mask[:, :], particles_w_strain[:, 3, :], np.nan)
     # Now compute the mean along the time dimension, ignoring the NaNs
@@ -187,42 +200,44 @@ def main():
                                 'Travel_t': travel_times[detected_idxs], 'travel_dist': traj_length[detected_idxs], 'avg_speed': speed[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 
                                 'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs], 'max_strain': max_strains[detected_idxs]})
 
+    # particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
+    #                             'Travel_t': travel_times[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
     
-    particles_df.plot(x='Travel_t', y='max_strain', style='o')
-    plt.ylabel('Maximum strain')
+    particles_df.plot(x='Travel_t', y='travel_dist', style='o')
+    plt.ylabel('trajectory length (mm)')
     plt.xlabel('Travel time')
-    plt.title('max strain v travel time')
+    plt.title('trajectory distance v travel time')
     plt.show()
     
     # Find pairs of jointly detected particles (same Detect_t; at least 2)
-    joint_detect_particles = particles_df[particles_df.duplicated('Detect_t', keep=False) == True]
+    # joint_detect_particles = particles_df[particles_df.duplicated('Detect_t', keep=False) == True]
 
-    # Self-merge dataframe with itself then use filtering to create dataframe with all possible combinations of particle pairs
-    merged_df = joint_detect_particles.merge(joint_detect_particles, on='Detect_t', suffixes=('_1', '_2'))
-    merged_df = merged_df[merged_df['Particle_ID_1'] != merged_df['Particle_ID_2']]
-    merged_df = merged_df[merged_df['Particle_ID_1'] < merged_df['Particle_ID_2']]
+    # # Self-merge dataframe with itself then use filtering to create dataframe with all possible combinations of particle pairs
+    # merged_df = joint_detect_particles.merge(joint_detect_particles, on='Detect_t', suffixes=('_1', '_2'))
+    # merged_df = merged_df[merged_df['Particle_ID_1'] != merged_df['Particle_ID_2']]
+    # merged_df = merged_df[merged_df['Particle_ID_1'] < merged_df['Particle_ID_2']]
 
-    # Create unique pair_ID
-    merged_df['Pair_ID'] = merged_df['Particle_ID_1'].astype(str) + '_' + merged_df['Particle_ID_2'].astype(str)
+    # # Create unique pair_ID
+    # merged_df['Pair_ID'] = merged_df['Particle_ID_1'].astype(str) + '_' + merged_df['Particle_ID_2'].astype(str)
 
-    # Compute differences in travel times, release times, strains
-    merged_df['delta_travel'] = abs(merged_df['Travel_t_1'] - merged_df['Travel_t_2'])
-    merged_df['delta_release'] = abs(merged_df['Release_t_1'] - merged_df['Release_t_2'])
-    merged_df['delta_t_avg_strain'] = abs(merged_df['t_avg_strain_1'] - merged_df['t_avg_strain_2'])
-    merged_df['delta_d_avg_strain'] = abs(merged_df['dist_avg_strain_1'] - merged_df['dist_avg_strain_2'])
-    merged_df['delta_sum_strain'] = abs(merged_df['cumulative_strain_1'] - merged_df['cumulative_strain_2'])
-    # merged_df['delta_detect_t'] = abs(merged_df['Detect_t_1'] - merged_df['Detect_t_2'])
+    # # Compute differences in travel times, release times, strains
+    # merged_df['delta_travel'] = abs(merged_df['Travel_t_1'] - merged_df['Travel_t_2'])
+    # merged_df['delta_release'] = abs(merged_df['Release_t_1'] - merged_df['Release_t_2'])
+    # merged_df['delta_t_avg_strain'] = abs(merged_df['t_avg_strain_1'] - merged_df['t_avg_strain_2'])
+    # merged_df['delta_d_avg_strain'] = abs(merged_df['dist_avg_strain_1'] - merged_df['dist_avg_strain_2'])
+    # merged_df['delta_sum_strain'] = abs(merged_df['cumulative_strain_1'] - merged_df['cumulative_strain_2'])
+    # # merged_df['delta_detect_t'] = abs(merged_df['Detect_t_1'] - merged_df['Detect_t_2'])
 
-    particle_pair_df = merged_df[['Pair_ID', 'Detect_t', 'delta_travel', 'delta_release', 'delta_t_avg_strain', 'delta_d_avg_strain', 'delta_sum_strain']]
-    particle_pair_samefreq = particle_pair_df.loc[particle_pair_df['delta_release']==0]
-    particle_pair_difffreq = particle_pair_df.loc[particle_pair_df['delta_release'] > 0]
+    # particle_pair_df = merged_df[['Pair_ID', 'Detect_t', 'delta_travel', 'delta_release', 'delta_t_avg_strain', 'delta_d_avg_strain', 'delta_sum_strain']]
+    # particle_pair_samefreq = particle_pair_df.loc[particle_pair_df['delta_release']==0]
+    # particle_pair_difffreq = particle_pair_df.loc[particle_pair_df['delta_release'] > 0]
 
-    plt.close()
-    particle_pair_difffreq.plot.scatter(x='delta_travel', y='delta_sum_strain', style='o')
-    plt.xlabel('difference in travel time')
-    plt.ylabel('difference in cumulative strain')
-    plt.title('Jointly detected particles: difference cumulative strain vs difference in travel time')
-    plt.show()
+    # plt.close()
+    # particle_pair_difffreq.plot.scatter(x='delta_travel', y='delta_sum_strain', style='o')
+    # plt.xlabel('difference in travel time')
+    # plt.ylabel('difference in cumulative strain')
+    # plt.title('Jointly detected particles: difference cumulative strain vs difference in travel time')
+    # plt.show()
 
 
 
