@@ -85,8 +85,8 @@ def main():
     ########## PART 1: Extract particle tracking data and add strain and acceleration data, if needed
 
     # Load particle tracking data; original dimensions (time, features, particles) = (9001, 3, 180000)
-    # particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
-    # particle_matrix = particle_matrix[:3001, :, :60000]
+    particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
+    particle_matrix = particle_matrix[:9001, :, :180000]
 
     # # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
     # # f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
@@ -119,96 +119,101 @@ def main():
 
     ################ END PART 1 ###################
 
+    #### STRAINS VS TRAVEL TIME CALCS ##########
+
     # Load expanded particle tracking data if already computed
     # Numpy file columns (in this order): release time, x, y, strain (at each time step) = (9001, 4, 180000)
-    file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t0to180_D1.5.npy'
-    particles_w_strain = np.load(file_name)
-    n_tsteps, n_features, n_particles = particles_w_strain.shape
-    dt = 0.02
+    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t0to180_D1.5.npy'
+    # particles_w_strain = np.load(file_name)
+    # n_tsteps, n_features, n_particles = particles_w_strain.shape
+    # dt = 0.02
 
-    # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
-    det_x = 0.45  # downstream detector distance (m)
-    det_y = 0  # cross-stream detector position (m, center of detector)
-    det_width = 0.01  # detector width, streamwise (m)
-    det_height = 0.0465  # detector height, cross-stream (m)
+    # # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
+    # det_x = 0.45  # downstream detector distance (m)
+    # det_y = 0  # cross-stream detector position (m, center of detector)
+    # det_width = 0.01  # detector width, streamwise (m)
+    # det_height = 0.0465  # detector height, cross-stream (m)
 
-    # Flatten and mask particle data
-    particles_flat = particles_w_strain.transpose(1, 0, 2)
-    particles_flat = particles_flat.reshape(n_features, n_tsteps * n_particles)
-    valid_mask = ~np.isnan(particles_flat[1, :]) & ~np.isnan(particles_flat[2, :])
+    # # Flatten and mask particle data
+    # particles_flat = particles_w_strain.transpose(1, 0, 2)
+    # particles_flat = particles_flat.reshape(n_features, n_tsteps * n_particles)
+    # valid_mask = ~np.isnan(particles_flat[1, :]) & ~np.isnan(particles_flat[2, :])
     
-    # Flattened array for timesteps
-    valid_timesteps = np.repeat(np.arange(n_tsteps), n_particles)
+    # # Flattened array for timesteps
+    # valid_timesteps = np.repeat(np.arange(n_tsteps), n_particles)
 
-    # Filter to valid particles & timesteps
-    valid_particles = particles_flat[:, valid_mask]
-    # DELETE particles_flat 
-    del particles_flat
-    DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
-    valid_timesteps = valid_timesteps[valid_mask]
-    DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
+    # # Filter to valid particles & timesteps
+    # valid_particles = particles_flat[:, valid_mask]
+    # # DELETE particles_flat 
+    # del particles_flat
+    # DEBUG(f"Shape of valid particles array: {valid_particles.shape}")
+    # valid_timesteps = valid_timesteps[valid_mask]
+    # DEBUG(f"Shape of valid timesteps array: {valid_timesteps.shape}")
 
-    # Obtain x and y coordinates and extract new field values
-    x_coords = valid_particles[1, :]
-    y_coords = valid_particles[2, :]
+    # # Obtain x and y coordinates and extract new field values
+    # x_coords = valid_particles[1, :]
+    # y_coords = valid_particles[2, :]
 
-    # Define conditions for sensor detection
-    det_condition = ((det_x <= x_coords) & (x_coords <= (det_x + det_width))) & (((det_y - det_height / 2) <= y_coords) & (y_coords <= (det_y + det_height / 2)))
+    # # Define conditions for sensor detection
+    # det_condition = ((det_x <= x_coords) & (x_coords <= (det_x + det_width))) & (((det_y - det_height / 2) <= y_coords) & (y_coords <= (det_y + det_height / 2)))
 
-    cond_array = np.full(n_tsteps * n_particles, False)
-    cond_array[valid_mask] = np.where(det_condition, det_condition, False)
-    cond_array = cond_array.reshape(n_tsteps, n_particles).T  # Now 60000 x 3000 array of T/F, or NAN
-    # first_detect = np.zeros_like(cond_array, dtype=bool)
-    # first_detect_time = np.arange(len(cond_array)), cond_array.argmax(axis=1)
-    first_detect_idxs = cond_array.argmax(axis=1)
+    # cond_array = np.full(n_tsteps * n_particles, False)
+    # cond_array[valid_mask] = np.where(det_condition, det_condition, False)
+    # cond_array = cond_array.reshape(n_tsteps, n_particles).T  # Now 60000 x 3000 array of T/F, or NAN
+    # # first_detect = np.zeros_like(cond_array, dtype=bool)
+    # # first_detect_time = np.arange(len(cond_array)), cond_array.argmax(axis=1)
+    # first_detect_idxs = cond_array.argmax(axis=1)
 
-    # Vector of particle id numbers
-    particle_ids = np.linspace(0, n_particles-1, n_particles, dtype=int)
-    # extract release times and cumulative strain from particle matrix
-    release_times = particles_w_strain[0, 0, :].round(2)
-    # release_idxs = ((release_times / dt).astype(int))
-    travel_times = (first_detect_idxs - ((release_times / dt).astype(int))) * dt
+    # # Vector of particle id numbers
+    # particle_ids = np.linspace(0, n_particles-1, n_particles, dtype=int)
+    # # extract release times and cumulative strain from particle matrix
+    # release_times = particles_w_strain[0, 0, :].round(2)
+    # # release_idxs = ((release_times / dt).astype(int))
+    # travel_times = (first_detect_idxs - ((release_times / dt).astype(int))) * dt
 
-    # average strain from release time to first detection for each detected particle
-    # First, create a mask to select the appropriate slices for each particle
-    mask = np.arange(particles_w_strain.shape[0])[:, np.newaxis]  # shape (timesteps, 1)
-    # Create a boolean mask for each particle's range
-    bool_mask = (mask >= ((release_times / dt).astype(int))) & (mask < first_detect_idxs)
-    # Calculate the average strain across the valid range for each particle
-    strains = np.where(bool_mask[:, :], particles_w_strain[:, 3, :], np.nan)
-    # Now compute the mean along the time dimension, ignoring the NaNs
-    avg_strains = np.nanmean(strains, axis=0)
-    cum_strains = np.nansum(strains, axis=0)
-    max_strains = np.nanmax(strains, axis=0)
+    # # average strain from release time to first detection for each detected particle
+    # # First, create a mask to select the appropriate slices for each particle
+    # mask = np.arange(particles_w_strain.shape[0])[:, np.newaxis]  # shape (timesteps, 1)
+    # # Create a boolean mask for each particle's range
+    # bool_mask = (mask >= ((release_times / dt).astype(int))) & (mask < first_detect_idxs)
+    # # Calculate the average strain across the valid range for each particle
+    # strains = np.where(bool_mask[:, :], particles_w_strain[:, 3, :], np.nan)
+    # # Now compute the mean along the time dimension, ignoring the NaNs
+    # avg_strains = np.nanmean(strains, axis=0)
+    # cum_strains = np.nansum(strains, axis=0)
+    # max_strains = np.nanmax(strains, axis=0)
 
-    # Compute length of trajectories
-    traj_coords_x = np.where(bool_mask[:, :], particles_w_strain[:, 1, :], np.nan)
-    traj_x_prev = np.roll(traj_coords_x, 1, axis=0)
-    traj_coords_y = np.where(bool_mask[:, :], particles_w_strain[:, 2, :], np.nan)
-    traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
-    traj_length = np.nansum(1000*(np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
-    strains_distavg = cum_strains / traj_length
+    # # Compute length of trajectories
+    # traj_coords_x = np.where(bool_mask[:, :], particles_w_strain[:, 1, :], np.nan)
+    # traj_x_prev = np.roll(traj_coords_x, 1, axis=0)
+    # traj_coords_y = np.where(bool_mask[:, :], particles_w_strain[:, 2, :], np.nan)
+    # traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
+    # traj_length = np.nansum(1000*(np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
+    # strains_distavg = cum_strains / traj_length
 
-    # Compute average speed of particles
-    speed = traj_length / travel_times  # mm/sec
+    # # Compute average speed of particles
+    # speed = traj_length / travel_times  # mm/sec
 
-    # Create mask for detected particles based on detect time not equal to zero
-    detected_idxs = np.where(first_detect_idxs != 0, True, False)
+    # # Create mask for detected particles based on detect time not equal to zero
+    # detected_idxs = np.where(first_detect_idxs != 0, True, False)
   
-    # Dataframe of detected particles
-    particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
-                                'Travel_t': travel_times[detected_idxs], 'travel_dist': traj_length[detected_idxs], 'avg_speed': speed[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 
-                                'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs], 'max_strain': max_strains[detected_idxs]})
-
+    # # Dataframe of detected particles
     # particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
-    #                             'Travel_t': travel_times[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
+    #                             'Travel_t': travel_times[detected_idxs], 'travel_dist': traj_length[detected_idxs], 'avg_speed': speed[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 
+    #                             'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs], 'max_strain': max_strains[detected_idxs]})
+
+    # # particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
+    # #                             'Travel_t': travel_times[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
     
-    particles_df.plot(x='Travel_t', y='travel_dist', style='o')
-    plt.ylabel('trajectory length (mm)')
-    plt.xlabel('Travel time')
-    plt.title('trajectory distance v travel time')
-    plt.show()
+    # particles_df.plot(x='Travel_t', y='travel_dist', style='o')
+    # plt.ylabel('trajectory length (mm)')
+    # plt.xlabel('Travel time')
+    # plt.title('trajectory distance v travel time')
+    # plt.show()
     
+
+    ### JOINTLY DETECTED PARTICLES ANALYSIS #########
+
     # Find pairs of jointly detected particles (same Detect_t; at least 2)
     # joint_detect_particles = particles_df[particles_df.duplicated('Detect_t', keep=False) == True]
 
@@ -239,13 +244,55 @@ def main():
     # plt.title('Jointly detected particles: difference cumulative strain vs difference in travel time')
     # plt.show()
 
+    ########## COMPUTE PAIRED PARTICLE SEPARATIONS OVER TIME ##########
+
+    # Convert x and y to mm
+    particle_matrix[:, 1:3, :] = particle_matrix[:, 1:3, :] * 1000
+
+    max_t_steps = 150
+    n_tsteps = particle_matrix.shape[0] - max_t_steps - 100
+    r2_array = np.zeros(n_tsteps)
+    # Select times for plotting
+    t_list = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.25, 2.5, 2.75, 3])
+    t_list_10 = t_list*10
+    # t_list = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    dt = 0.02
+    t_list_idx = (t_list / dt).astype(int) 
+    r2_list = np.zeros(len(t_list))
+
+    d_release_list = [0, 10, 25, 50]
+    all_r2_list = np.zeros((len(d_release_list), len(r2_list)))
+    all_idx = 0
+
+    for delta_release in d_release_list:
+        idx = 0
+        for compute_t in t_list_idx:
+            t=0
+            for t in range(n_tsteps-1):
+                t += 1
+                # compute squared distance as delta x squared + delta y squared
+                # delta_release = 0  # timesteps separating the release of the particles
+                t0 = int(round(particle_matrix[0, 0, t*20 + 20*delta_release] / dt, 0))
+                r2_val = (particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)])**2 + (particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)])**2
+                r2_array[t] = np.nanmean(r2_val)  # average r2 value for those 20 particles released that timestep
+            r2_list[idx] = np.nanmean(r2_array)
+            idx +=1
+        all_r2_list[all_idx, :] = r2_list
+        all_idx += 1
 
 
+    t2_array = t_list_10 ** 2
+    for i in range(len(d_release_list)):
+        plt.plot(t2_array, all_r2_list[i, :], label=f'p_sep: {d_release_list[i]}')
+    plt.xlabel('t^2 (squared time from release of 2nd particle in pair, sec^3)')
+    plt.ylabel('<r^2> (ensemble-averaged sq distance between particles, mm^2)')
+    plt.title('t2 scaling test - extended simulation')
+    plt.show()
 
+    ####### plotting and analyzing strain & acceleration along Lagrangian trajectories ########
 
-    # PART 2: plotting and analyzing strain & acceleration along Lagrangian trajectories
-    xlim = [0, 0.5]
-    ylim = [-0.211, 0.211]
+    # xlim = [0, 0.5]
+    # ylim = [-0.211, 0.211]
 
     # # QC: spatial plot of strain vals at a few times
     # plot_times = [100, 500, 1000, 2999]
