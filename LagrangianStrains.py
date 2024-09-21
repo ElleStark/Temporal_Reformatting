@@ -190,25 +190,28 @@ def main():
     # traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
     # traj_length = np.nansum(1000*(np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
     # strains_distavg = cum_strains / traj_length
+    # t2_avg_strain = cum_strains / (travel_times)**2
+    # # t5_avg_strain = cum_strains / (travel_times)**5
 
     # # Compute average speed of particles
     # speed = traj_length / travel_times  # mm/sec
+    # horiz_speed = 450 / travel_times
 
     # # Create mask for detected particles based on detect time not equal to zero
-    # detected_idxs = np.where(first_detect_idxs != 0, True, False)
+    # detected_idxs = np.where((first_detect_idxs != 0) & (traj_length >=525) & (traj_length <=575), True, False)
   
     # # Dataframe of detected particles
     # particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
-    #                             'Travel_t': travel_times[detected_idxs], 'travel_dist': traj_length[detected_idxs], 'avg_speed': speed[detected_idxs], 't_avg_strain': avg_strains[detected_idxs], 
+    #                             'Travel_t': travel_times[detected_idxs]**2, 'travel_dist': traj_length[detected_idxs], 'avg_horiz_speed': horiz_speed[detected_idxs], 't2_avg_strain': t2_avg_strain[detected_idxs], 
     #                             'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs], 'max_strain': max_strains[detected_idxs]})
 
     # # particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
     # #                             'Travel_t': travel_times[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs]})
     
     # particles_df.plot(x='Travel_t', y='travel_dist', style='o')
-    # plt.ylabel('trajectory length (mm)')
-    # plt.xlabel('Travel time')
-    # plt.title('trajectory distance v travel time')
+    # plt.ylabel('travel distance (mm)')
+    # plt.xlabel('travel time^2 (s)')
+    # plt.title('travel length vs travel time, traj length = 525 to 575')
     # plt.show()
     
 
@@ -246,26 +249,33 @@ def main():
 
     ########## COMPUTE PAIRED PARTICLE SEPARATIONS OVER TIME ##########
 
-    # Convert x and y to mm
-    particle_matrix[:, 1:3, :] = particle_matrix[:, 1:3, :] * 1000
+    # Convert x and y to cm
+    # particle_matrix[:, 1:3, :] = particle_matrix[:, 1:3, :] * 100
+    mean_u = 10 # cm/s
+    # epsilon =  # energy dissipation rate per unit mass
 
-    max_t_steps = 150
+    max_t_steps = 225
     n_tsteps = particle_matrix.shape[0] - max_t_steps - 100
-    r2_array = np.zeros(n_tsteps)
-    # Select times for plotting
-    t_list = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.25, 2.5, 2.75, 3])
+    r2_array = np.zeros((n_tsteps, 20))
+    r2_0 = np.zeros((n_tsteps, 20))
+    # Select times for plotting - for log-log, always want to have 0 as well as first possible time
+    t_list = np.array([0, 0.02, 0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5])
     t_list_10 = t_list*10
     # t_list = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
     dt = 0.02
     t_list_idx = (t_list / dt).astype(int) 
     r2_list = np.zeros(len(t_list))
+    # r0_list = np.zeros(len(t_list))
 
-    d_release_list = [0, 10, 25, 50]
+    # d_release_list = [0, 10, 25, 50]
+    d_release_list = [0, 1, 2, 3, 4, 5, 10, 25, 45, 46, 47, 48, 49, 50]
     all_r2_list = np.zeros((len(d_release_list), len(r2_list)))
+    all_r0_list = np.zeros((len(d_release_list)))
     all_idx = 0
 
     for delta_release in d_release_list:
         idx = 0
+        batchelor_t = ((delta_release*dt * mean_u)**2)
         for compute_t in t_list_idx:
             t=0
             for t in range(n_tsteps-1):
@@ -273,20 +283,44 @@ def main():
                 # compute squared distance as delta x squared + delta y squared
                 # delta_release = 0  # timesteps separating the release of the particles
                 t0 = int(round(particle_matrix[0, 0, t*20 + 20*delta_release] / dt, 0))
-                r2_val = (particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)])**2 + (particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)])**2
-                r2_array[t] = np.nanmean(r2_val)  # average r2 value for those 20 particles released that timestep
-            r2_list[idx] = np.nanmean(r2_array)
-            idx +=1
+                r2_val = np.sqrt((particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)])**2 + (particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)])**2)
+                r2_array[t, :] = r2_val
+                # if compute_t == 0:
+                #     r2_0[t, :] = r2_val.copy()  # for each set of 20 particles, we have a set of initial separations
+                # r2_array[t] = np.nanmean((r2_val - r2_0[t, :])**2)  # average r2 value for those 20 particles released that timestep
+            if compute_t == t_list_idx[0]:
+                r2_0[:] = r2_array[:]
+            else:
+                r2_0 = r2_0
+
+            r2_list[idx] = np.nanmean((r2_array - r2_0)**2)
+            idx += 1
         all_r2_list[all_idx, :] = r2_list
+        all_r0_list[all_idx] = np.nanmean(r2_0)
         all_idx += 1
 
+    C2 = 2.13
+    # epsilon = np.load('ignore/inputs/viscous_dissipation_extendedSim.npy')  # 1201 x 1501 matrix of vals
+    epsilon = 0.006728  # m^2/s^3, for simplicity start with domain average
+    nu = 1.5 * 10**(-5)  # kinematic viscosity, m/s
+    t_eta = 0.1216  # s, kolmogorov microscale in time, entire domain
+    # t_eta = 0.0472  # first 0.05 m
 
-    t2_array = t_list_10 ** 2
-    for i in range(len(d_release_list)):
-        plt.plot(t2_array, all_r2_list[i, :], label=f'p_sep: {d_release_list[i]}')
-    plt.xlabel('t^2 (squared time from release of 2nd particle in pair, sec^3)')
-    plt.ylabel('<r^2> (ensemble-averaged sq distance between particles, mm^2)')
-    plt.title('t2 scaling test - extended simulation')
+
+    # t2_array = t_list_10 ** 2
+    # t3_array =t_list_10 ** 3
+
+    fig, ax = plt.subplots()
+
+    for i in range(len(d_release_list)-1):
+        i+=1
+        # Normalize r squared according to Ouellette et al., 2006
+        normalized_r2 = all_r2_list[i, :]/ ((11/3*C2*(epsilon*all_r0_list[i])**(2/3))*t_eta**2)
+        plt.loglog(t_list[1:]/t_eta, normalized_r2[1:], label=f'p_sep: {round(d_release_list[i]*dt, 2)}')
+    plt.xlabel('t/t_microscale')
+    plt.ylabel('<r^2> compensated per Ouellette et al.')
+    plt.title('log-log scaling: initial separations 0 to 1 s')
+    plt.legend()
     plt.show()
 
     ####### plotting and analyzing strain & acceleration along Lagrangian trajectories ########
