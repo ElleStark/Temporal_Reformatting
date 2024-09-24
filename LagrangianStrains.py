@@ -49,23 +49,37 @@ def add_newfield_to_particles(particle_data, field2=None):
 
     new_vals = np.full(n_tsteps * n_particles, np.nan)
     # new_vals[valid_mask] = new_data[valid_timesteps, x_idx, y_idx]
-    f_name = 'D:/singlesource_2d_extended/FTLE_extendedsim_180s.h5'
+    # f_name = 'D:/singlesource_2d_extended/FTLE_extendedsim_180s.h5'
+    # with h5py.File(f_name, 'r') as f:
+    # #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (9001, 1201, 1501)
+    #     new_data = f.get('maxPstrain')[:, :, :]
+    
+    f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
     with h5py.File(f_name, 'r') as f:
-    #     # Max Principal Strain & U velocity; original dimensions (time, columns, rows) = (9001, 1201, 1501)
-        new_data = f.get('maxPstrain')[:, :, :]
-    
-    DEBUG(f"strain data dimensions: {new_data.shape}")
-    new_vals[valid_mask] = new_data[valid_timesteps, y_idx, x_idx]
-    DEBUG(f"Filtered strain data dimensions: {new_data.shape}")
+        v_data = f.get('Flow Data/v')[:-1, :, :].transpose(0, 2, 1)  # Remove final(?) timestep to match particle tracking & strain data
+        # v_data = f.get('Flow Data/v')[:-1, :, :].transpose(0, 2, 1)
+
+    # DEBUG(f"strain data dimensions: {new_data.shape}")
+    new_vals[valid_mask] = v_data[valid_timesteps, y_idx, x_idx].astype(np.float32)
+    # DEBUG(f"Filtered strain data dimensions: {new_data.shape}")
     new_vals = new_vals.reshape(n_tsteps, n_particles)
+    np.save('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_0to180s_vdata.npy', new_vals)
+
     # Concatenate to original data
-    DEBUG("Concatenating new data to existing matrix")
-    start = time.time()
-    particle_data_expanded = np.concatenate((particle_data, new_vals[:, np.newaxis, :]), axis=1)
-    DEBUG(f"Concatenation completed in {round(time.time()-start, 2)} sec.")
+    # DEBUG("Concatenating u data to existing matrix")
+    # start = time.time()
+    # particle_data_expanded = np.concatenate((particle_data, new_vals[:, np.newaxis, :]), axis=1)
+    # DEBUG(f"u Concatenation completed in {round(time.time()-start, 2)} sec.")
     
-    if field2 is None:
-        INFO("1 New field added to particle data.")
+    # new_vals[valid_mask] = v_data[valid_timesteps, y_idx, x_idx]
+    # new_vals = new_vals.reshape(n_tsteps, n_particles)
+    # DEBUG("Concatenating v data to existing matrix")
+    # start = time.time()
+    # particle_data_expanded = np.concatenate((particle_data_expanded, new_vals[:, np.newaxis, :]), axis=1)
+    # DEBUG(f"v Concatenation completed in {round(time.time()-start, 2)} sec.")
+
+    # if field2 is None:
+    #     INFO("1 New field added to particle data.")
     
     # else:
     #     new_vals2 = np.full(particles_flat.shape[0], np.nan)
@@ -77,7 +91,8 @@ def add_newfield_to_particles(particle_data, field2=None):
     #     DEBUG(f"Concatenation 2 completed in {round(time.time()-start, 2)} sec.")
     #     INFO("2 new fields added to particle data.")
 
-    return particle_data_expanded
+    # return particle_data_expanded
+    return
 
 
 def main():
@@ -86,7 +101,10 @@ def main():
 
     # Load particle tracking data; original dimensions (time, features, particles) = (9001, 3, 180000)
     particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
-    particle_matrix = particle_matrix[:9001, :, :180000]
+    # particle_matrix = particle_matrix.astype(np.float32)
+    # np.save('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_f32.npy', particle_matrix)
+
+    # particle_matrix = particle_matrix[:9001, :, :180000]
 
     # # Obtain the instantaneous max principal strain at all time steps (HDF5 file)
     # # f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
@@ -109,12 +127,13 @@ def main():
     # # # Compute streamwise acceleration at all timesteps
     # # accel_x = np.gradient(u_data, axis=0)
 
-    # # # For each x, y, t location listed in particle tracking data matrices, retrieve the associated strain at that time step
-    # particles_w_strain = add_newfield_to_particles(particle_matrix)
+    # # # For each x, y, t location listed in particle tracking data matrices, retrieve the associated velocity at that time step
+    # add_newfield_to_particles(particle_matrix)
+    # particles_w_velocities = add_newfield_to_particles(particle_matrix)
     # # Data matrix is now: release time, x, y, strain, at each time step
-    # file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t0to180_D1.5.npy'
+    # file_name = 'ignore/ParticleTrackingData/ParticleVelocities_Extendedsim_n20_t0to180_D1.5.npy'
     # INFO(f"Saving expanded particle data to {file_name}.")
-    # np.save(file_name, particles_w_strain)
+    # np.save(file_name, particles_w_velocities)
     # INFO("Save complete.")
 
     ################ END PART 1 ###################
@@ -254,23 +273,27 @@ def main():
     mean_u = 10 # cm/s
     # epsilon =  # energy dissipation rate per unit mass
 
-    max_t_steps = 225
+    max_t_steps = 300
     n_tsteps = particle_matrix.shape[0] - max_t_steps - 100
     r2_array = np.zeros((n_tsteps, 20))
+    # D_LL_array = np.zeros((n_tsteps, 20))
     r2_0 = np.zeros((n_tsteps, 20))
     # Select times for plotting - for log-log, always want to have 0 as well as first possible time
-    t_list = np.array([0, 0.02, 0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5])
+    t_list = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5, 5.25, 5.5, 5.75, 6])
     t_list_10 = t_list*10
     # t_list = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
     dt = 0.02
     t_list_idx = (t_list / dt).astype(int) 
     r2_list = np.zeros(len(t_list))
-    # r0_list = np.zeros(len(t_list))
+    # r_list = np.zeros(len(t_list))
 
     # d_release_list = [0, 10, 25, 50]
-    d_release_list = [0, 1, 2, 3, 4, 5, 10, 25, 45, 46, 47, 48, 49, 50]
+    d_release_list = [0, 1, 2, 5, 10, 20, 30, 40, 50]
+    # d_release_list = [0, 1, 2, 3, 4, 5]
     all_r2_list = np.zeros((len(d_release_list), len(r2_list)))
     all_r0_list = np.zeros((len(d_release_list)))
+    # all_r_list = np.zeros((len(d_release_list)))
+    # all_D_LL_list = np.zeros((len(d_release_list)))
     all_idx = 0
 
     for delta_release in d_release_list:
@@ -280,30 +303,54 @@ def main():
             t=0
             for t in range(n_tsteps-1):
                 t += 1
-                # compute squared distance as delta x squared + delta y squared
-                # delta_release = 0  # timesteps separating the release of the particles
                 t0 = int(round(particle_matrix[0, 0, t*20 + 20*delta_release] / dt, 0))
-                r2_val = np.sqrt((particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)])**2 + (particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)])**2)
-                r2_array[t, :] = r2_val
-                # if compute_t == 0:
-                #     r2_0[t, :] = r2_val.copy()  # for each set of 20 particles, we have a set of initial separations
-                # r2_array[t] = np.nanmean((r2_val - r2_0[t, :])**2)  # average r2 value for those 20 particles released that timestep
+                # find separation vectors for particle pairs
+                # x_diffs = particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)]
+                # y_diffs = particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)]
+
+                # compute squared distance as delta x squared + delta y squared
+                # t0 = int(round(particle_matrix[0, 0, t*20 + 20*delta_release] / dt, 0))
+                separations = np.sqrt((particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)])**2 + (particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)])**2)
+                r2_array[t, :] = separations
+
+                # if compute_t == t_list_idx[0]:
+                #     ########## D_LL(t=0) COMPUTATION ##########
+                #     # extract velocity field at each particle position
+                #     u_vals = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_0to180s_udata.npy')[t0, :]
+                #     v_vals = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_0to180s_vdata.npy')[t0, :]
+
+                #     # find difference in velocities for each particle pair
+                #     u_diffs = u_vals[(t*20-20):(t*20)] - u_vals[(t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)]  
+                #     v_diffs = v_vals[(t*20-20):(t*20)] - v_vals[(t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)]
+
+                #     # find and square the longitudinal component
+                #     # store D_LL for all particle offsets
+                #     for particle_idx in range(D_LL_array.shape[1]):
+                #         D_LL_array[t, particle_idx] = (np.dot(np.array([x_diffs[particle_idx], y_diffs[particle_idx]]), np.array([u_diffs[particle_idx], v_diffs[particle_idx]])) / separations[particle_idx])**2
+            
             if compute_t == t_list_idx[0]:
                 r2_0[:] = r2_array[:]
             else:
                 r2_0 = r2_0
 
             r2_list[idx] = np.nanmean((r2_array - r2_0)**2)
+            # r2_list[idx] = np.nanmean(r2_array)**2
+            # r_list[idx] = np.nanmean(r2_array)
             idx += 1
         all_r2_list[all_idx, :] = r2_list
-        all_r0_list[all_idx] = np.nanmean(r2_0)
+        all_r0_list[all_idx] = np.nanmean(r2_0**2)
+        # all_r_list[all_idx] = np.nanmean(r_list)
+        # all_D_LL_list[all_idx] = np.nanmean(D_LL_array)
         all_idx += 1
 
     C2 = 2.13
     # epsilon = np.load('ignore/inputs/viscous_dissipation_extendedSim.npy')  # 1201 x 1501 matrix of vals
-    epsilon = 0.006728  # m^2/s^3, for simplicity start with domain average
+    # epsilon = 0.001015  # m^2/s^3, for simplicity start with domain average
+    # epsilon = 0.0025
+    epsilon = 0.006728  # m^2/s^3, first 0.05 m
     nu = 1.5 * 10**(-5)  # kinematic viscosity, m/s
     t_eta = 0.1216  # s, kolmogorov microscale in time, entire domain
+    g = 0.5  # Richardson constant
     # t_eta = 0.0472  # first 0.05 m
 
 
@@ -312,79 +359,111 @@ def main():
 
     fig, ax = plt.subplots()
 
-    for i in range(len(d_release_list)-1):
-        i+=1
+    # for i in range(len(d_release_list)-1):
+    #     i+=1
         # Normalize r squared according to Ouellette et al., 2006
-        normalized_r2 = all_r2_list[i, :]/ ((11/3*C2*(epsilon*all_r0_list[i])**(2/3))*t_eta**2)
-        plt.loglog(t_list[1:]/t_eta, normalized_r2[1:], label=f'p_sep: {round(d_release_list[i]*dt, 2)}')
-    plt.xlabel('t/t_microscale')
-    plt.ylabel('<r^2> compensated per Ouellette et al.')
+        # normalized_r2 = all_r2_list[i, :]/ ((11/3*C2*(epsilon*all_r0_list[i])**(2/3))*t_eta**2)
+        # Normalize r according to Tan & Ni 2022
+    #     t_zero = epsilon**(-1/3)*all_r0_list[i]**(2/3)
+    #     D_LL = all_D_LL_list[i]
+    #     normalized_r2 = all_r2_list[i, :]/ (t_zero**2 * D_LL)
+    #     plt.loglog(t_list[1:]/t_eta, normalized_r2[1:], label=f'p_sep: {round(d_release_list[i]*dt, 2)}')
+    # plt.loglog(t_list[1:]/t_zero, (t_list[1:]/t_zero)**2, color='black')
+
+    # plt.xlabel('t/t_microscale')
+    # plt.ylabel('<r^2> compensated per Ouellette et al.')
+    # plt.title('log-log scaling: initial separations 0 to 1 s')
+
+    for i in range(len(d_release_list)-1):
+        # i+=1
+        plt.loglog(t_list[1:], all_r2_list[i, 1:], label=f'p_sep: {round(d_release_list[i]*dt, 2)}')
+        # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2 - 2*all_r_list[i]*all_r0_list[i], color='blue')
+        # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2, color='red')
+    
+    # Exponential fit at early times for particle separations for pairs with 0 initial separation 
+    plt.loglog(t_list[1:8], 0.4*(all_r0_list[0]*np.exp(t_list[1:8]/0.07) - all_r0_list[0]), color='red')
+    
+    # t^3 fit for later times for particle separations for pairs with 0 initial separation, compensated by t^3
+    # plt.loglog(t_list[1:], all_r2_list[0, 1:])
+    # plt.scatter(t_list[1], g*epsilon* t_list[1]**3)
+    # plt.scatter(t_list[-1], g*0.0001*t_list[-1]**3)
+
+    # t^(3/2) curve for later times
+    plt.loglog(t_list[4:], g*epsilon*t_list[4:]**(3/2), color='black')
+    
+    # Expected fit:
+    plt.loglog(t_list[1:8], epsilon*t_list[1:8]**(2), color='black')
+    # Better fit for our data:
+    # plt.loglog(t_list[1:8], 0.8*epsilon*t_list[1:8]**(29/16), color='black')
+    plt.xlabel('t (s)')
+    plt.ylabel('<|r-r0|>^2')
     plt.title('log-log scaling: initial separations 0 to 1 s')
+
     plt.legend()
     plt.show()
 
-    ####### plotting and analyzing strain & acceleration along Lagrangian trajectories ########
+    # ####### plotting and analyzing strain & acceleration along Lagrangian trajectories ########
 
-    # xlim = [0, 0.5]
-    # ylim = [-0.211, 0.211]
+    # # xlim = [0, 0.5]
+    # # ylim = [-0.211, 0.211]
 
-    # # QC: spatial plot of strain vals at a few times
-    # plot_times = [100, 500, 1000, 2999]
-    # for t in plot_times:
-    #     plot_data = particles_w_strain[t, :, :]
-    #     plt.scatter(plot_data[1, :], plot_data[2, :], c=plot_data[3, :], s=100)
-    #     plt.colorbar()
-    #     plt.xlim(xlim[0], xlim[1])
-    #     plt.ylim(ylim[0], ylim[1])
-    #     plt.show()
+    # # # QC: spatial plot of strain vals at a few times
+    # # plot_times = [100, 500, 1000, 2999]
+    # # for t in plot_times:
+    # #     plot_data = particles_w_strain[t, :, :]
+    # #     plt.scatter(plot_data[1, :], plot_data[2, :], c=plot_data[3, :], s=100)
+    # #     plt.colorbar()
+    # #     plt.xlim(xlim[0], xlim[1])
+    # #     plt.ylim(ylim[0], ylim[1])
+    # #     plt.show()
 
-    # # PLOT: spatial plot of strain along trajectories for all time for particles 1-20
-    # fig, ax = plt.subplots()
-    # startidx = 2100
-    # endidx = 2120
-    # for p in range(startidx, endidx):
-    #     plt.scatter(particles_w_strain[:, 1, p], particles_w_strain[:, 2, p], c=particles_w_strain[:, 3, p], cmap=cmr.ember, 
-    #                 norm=colors.LogNorm(), s=25, alpha=0.5)
-    # plt.colorbar()
-    # plt.xlim(xlim[0], xlim[1])
-    # plt.ylim(ylim[0], ylim[1])
-    # plt.title(f'Strain along trajectories, release time {round(particles_w_strain[0, 0, startidx], 2)} s')
-    # plt.show()
+    # # # PLOT: spatial plot of strain along trajectories for all time for particles 1-20
+    # # fig, ax = plt.subplots()
+    # # startidx = 2100
+    # # endidx = 2120
+    # # for p in range(startidx, endidx):
+    # #     plt.scatter(particles_w_strain[:, 1, p], particles_w_strain[:, 2, p], c=particles_w_strain[:, 3, p], cmap=cmr.ember, 
+    # #                 norm=colors.LogNorm(), s=25, alpha=0.5)
+    # # plt.colorbar()
+    # # plt.xlim(xlim[0], xlim[1])
+    # # plt.ylim(ylim[0], ylim[1])
+    # # plt.title(f'Strain along trajectories, release time {round(particles_w_strain[0, 0, startidx], 2)} s')
+    # # plt.show()
 
-    # # PLOT: many-line plot of strain as f(t) with 0 as release time
-    # plt.close()
-    # fig, ax = plt.subplots(figsize=(8, 4))
-    # for p in range(startidx, endidx):
-    #     plot_data = particles_w_strain[:, 3, p]
-    #     plot_data = plot_data[~np.isnan(plot_data)]
-    #     plt.plot(plot_data)
-    # plt.ylim(0, 15)
-    # plt.xlim(0, 250)
-    # plt.ylabel('max principal strain')
-    # plt.xlabel('timesteps from release')
-    # plt.show()
+    # # # PLOT: many-line plot of strain as f(t) with 0 as release time
+    # # plt.close()
+    # # fig, ax = plt.subplots(figsize=(8, 4))
+    # # for p in range(startidx, endidx):
+    # #     plot_data = particles_w_strain[:, 3, p]
+    # #     plot_data = plot_data[~np.isnan(plot_data)]
+    # #     plt.plot(plot_data)
+    # # plt.ylim(0, 15)
+    # # plt.xlim(0, 250)
+    # # plt.ylabel('max principal strain')
+    # # plt.xlabel('timesteps from release')
+    # # plt.show()
 
-    # PLOT: ILS line plots of slice at x=0, x=0.025, x=0.05 m
-    # file_path = 'C:/Users/elles/Documents/CU_Boulder/Fluids_Research/FisherPlume_plots/flow_stats_plots/ignore/ILS_ustreamwise.npy'
-    # ILS_data = np.load(file_path)  # original dimensions: (y, x) = (846, 1001)
-    # ILS_subset = ILS_data[123:724, 0:101]
+    # # PLOT: ILS line plots of slice at x=0, x=0.025, x=0.05 m
+    # # file_path = 'C:/Users/elles/Documents/CU_Boulder/Fluids_Research/FisherPlume_plots/flow_stats_plots/ignore/ILS_ustreamwise.npy'
+    # # ILS_data = np.load(file_path)  # original dimensions: (y, x) = (846, 1001)
+    # # ILS_subset = ILS_data[123:724, 0:101]
 
-    # # spatial average: time-averaged ILS for x=0 to 0.05 m, y=-0.15 to y=0.15 m
-    # INFO(f'ILS spatial avg, x range [0, 0.05] m, y range [-0.15, 0.15] m: {round(np.mean(ILS_subset), 4)} m.')
+    # # # spatial average: time-averaged ILS for x=0 to 0.05 m, y=-0.15 to y=0.15 m
+    # # INFO(f'ILS spatial avg, x range [0, 0.05] m, y range [-0.15, 0.15] m: {round(np.mean(ILS_subset), 4)} m.')
 
-    # xidxs = [0, 50, 100]
-    # plt.close()
-    # fig, ax = plt.subplots()
-    # for xidx in xidxs:
-    #     plt.plot(ILS_subset[:, xidx], label=(f'x={xidx*0.0005} m'))
-    # plt.ylabel('ILS (m)')
-    # plt.xlabel('y location (idx)')
-    # plt.legend()
-    # plt.show()        
+    # # xidxs = [0, 50, 100]
+    # # plt.close()
+    # # fig, ax = plt.subplots()
+    # # for xidx in xidxs:
+    # #     plt.plot(ILS_subset[:, xidx], label=(f'x={xidx*0.0005} m'))
+    # # plt.ylabel('ILS (m)')
+    # # plt.xlabel('y location (idx)')
+    # # plt.legend()
+    # # plt.show()        
 
-    # PLOT: many-line plot of acceleration as f(t) with 0 as release time
+    # # PLOT: many-line plot of acceleration as f(t) with 0 as release time
 
-    # Think about particle PAIRS: xxxx as f(diff in release times)
+    # # Think about particle PAIRS: xxxx as f(diff in release times)
 
 if __name__=='__main__':
     main()
