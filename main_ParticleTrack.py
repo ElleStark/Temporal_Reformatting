@@ -11,12 +11,12 @@ import scipy.io
 
 def main():
     # Define data subset
-    x_lims = slice(None, None)
-    y_lims = slice(None, None)
+    x_lims = slice(0, 20)
+    y_lims = slice(100, 1100)
     time_lims = slice(0, 9001)
 
     # Import required data from H5 file
-    f_name = 'D:/singlesource_2d_extended/180to360/Re100_0_5mm_50Hz_singlesource_2d_180to360s.h5'
+    f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
     with h5py.File(f_name, 'r') as f:
         # Metadata: spatiotemporal resolution and domain size
         freq = f.get('Model Metadata/timeResolution')[0].item()
@@ -33,8 +33,8 @@ def main():
 
         # Velocities: for faster reading, can read in subset of u and v data here
         # dimensions of multisource plume data (time, columns, rows) = (3001, 1001, 846); extended is (9001, 1501, 1201)
-        # u_data = f.get('Flow Data/u')[time_lims, x_lims, y_lims].T
-        # v_data = f.get('Flow Data/v')[time_lims, x_lims, y_lims].T
+        u_data = f.get('Flow Data/u')[time_lims, x_lims, y_lims]
+        v_data = f.get('Flow Data/v')[time_lims, x_lims, y_lims]
 
     # desired flow field resolution
     dx_sim = dx
@@ -51,44 +51,77 @@ def main():
     # Approximate and plot vortex shedding frequency at input if desired using fft
     # flow.find_plot_psd([900, 901], [483, 484], plot=True)
 
-    # Odor source properties
-    osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
-    tau = dt  # seconds, time between particle releases
-    D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
-    # D_osrc = 0 
+    # ## TEST WITH SYNTHETIC DATA
+    # nx, ny = 128, 128
+    # n_timesteps = 20
+    # kx = np.fft.fftfreq(nx).reshape(-1, 1)
+    # ky = np.fft.fftfreq(ny).reshape(1, -1)
+    # k = np.sqrt(kx**2 + ky**2)
 
-    # Create odor object
-    odor_src = odor.OdorSource(tau, osrc_loc, D_osrc)
+    # # Generate synthetic power-law spectrum
+    # power_law_spectrum = k**(-5/3)
+    # power_law_spectrum[k == 0] = 0  # Avoid division by zero at k=0
 
-    # Use flowfield, odor, and simulation parameters to generate particle simulation object
-    duration = time_array_data[-2]
-    t0 = 0
-    test_sim = simulation.Simulation(flow, odor_src, duration, t0, dt_sim)
+    # u_data = np.zeros((n_timesteps, nx, ny))
+    # v_data = np.zeros((n_timesteps, nx, ny))
 
-    # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
-    n_particles = 20  # particles to be released AT EACH TIMESTEP
-    test_sim.track_particles_rw(n_particles, method='IE')
+    # for t in range(n_timesteps):
+    #     # Generate random phase
+    #     # random_phase = np.exp(2j * np.pi * np.random.rand(nx, ny))
+    #     # random_phase_v = np.exp(2j * np.pi * np.random.rand(nx, ny))
+    #     random_phase = 1
+    #     random_phase_v = 1
 
-    # Save raw trajectory data
-    note = 'nanUpstream'
-    # save to Numpy array:
-    sim = '_extended'
-    f_name = f'ignore/ParticleTrackingData/particleTracking_sim{sim}_n{n_particles}_fullsim_D1.5_{note}_180to360s.npy'
-    np.save(f_name, test_sim.trajectories)
+    #     # Inverse FFT to create synthetic velocity field
+    #     u_data[t] = np.fft.ifftn(np.sqrt(power_law_spectrum) * random_phase).real
+    #     v_data[t] = np.fft.ifftn(np.sqrt(power_law_spectrum) * random_phase_v).real
 
-    # Plot results
-    f_path = f'ignore/ParticleTrackingData/traj_plot_sim{sim}_n{n_particles}_d{round(odor_src.D_osrc, 1)}_{note}_180to360s'
-    test_sim.plot_trajectories(f_path, frames=list(range(test_sim.n_frames)), domain_width=domain_width, domain_length=domain_length, movie=True)
+    ## END SYNTHETIC DATA CREATION
 
-    # save to .mat file:
-    # dataset = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_180to360s.npy')
-    data_dict = {'data': test_sim.trajectories}
-    # dataset = test_sim.trajectories
-    f_path = f'ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D1.5.mat'
-    hdf5storage.savemat(f_path, data_dict, format='7.3', matlab_compatible=True, compress=True)
-    # scipy.io.savemat(f_path, {'data': test_sim.trajectories, 'meta':{'ParticleTrackingParams':{'num_particles': f'{n_particles} seeded each frame', 'num_frames': '9000', 'dt': '0.02 sec', 'duration': '180 sec (start:180s end:360s)', 'diffusionCoefficient': f'{D_osrc} m^2/s', 'gridResolution': '0.0005 meter', 'ParticleReleasePoint': '(0, 0)', 'NumericalAdvectionMethod': 'Improved Euler'}, 
-    #                                             'FlowfieldSimulationInfo':{'description':'2D grid turbulence Comsol model', 'source': 'modified from Fisher Plume manuscript Tootoonian et al., 2024', 'meanVelocity': '10 cm/s', 'xDomain': '[0, 0.75] meters', 'yDomain': '[-0.3, 0.3] meters'}, 
-    #                                             'FileCreationInfo': {'creationDate': 'Aug 2024', 'createdBy': 'Elle Stark, EFD Lab, CU Boulder CEAE Dept', 'contact': 'elle.stark@colorado.edu or aaron.true@colorado.edu'}}})
+
+    # Compute and plot energy spectrum
+    u_flx = u_data - np.mean(u_data, axis=0)
+    v_flx = v_data - np.mean(v_data, axis=0)
+    flow.find_plot_esd(u_data, v_data)
+
+    # # Odor source properties
+    # osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
+    # tau = dt  # seconds, time between particle releases
+    # D_osrc = 1.5*10**(-5)  # meters squared per second; particle diffusivity
+    # # D_osrc = 0 
+
+    # # Create odor object
+    # odor_src = odor.OdorSource(tau, osrc_loc, D_osrc)
+
+    # # Use flowfield, odor, and simulation parameters to generate particle simulation object
+    # duration = time_array_data[-2]
+    # t0 = 0
+    # test_sim = simulation.Simulation(flow, odor_src, duration, t0, dt_sim)
+
+    # # Compute simulation trajectories: array with time each particle is released & trajectory at each timestep (x, y position at each dt)
+    # n_particles = 20  # particles to be released AT EACH TIMESTEP
+    # test_sim.track_particles_rw(n_particles, method='IE')
+
+    # # Save raw trajectory data
+    # note = 'nanUpstream'
+    # # save to Numpy array:
+    # sim = '_extended'
+    # f_name = f'ignore/ParticleTrackingData/particleTracking_sim{sim}_n{n_particles}_fullsim_D1.5_{note}_180to360s.npy'
+    # np.save(f_name, test_sim.trajectories)
+
+    # # Plot results
+    # f_path = f'ignore/ParticleTrackingData/traj_plot_sim{sim}_n{n_particles}_d{round(odor_src.D_osrc, 1)}_{note}_180to360s'
+    # test_sim.plot_trajectories(f_path, frames=list(range(test_sim.n_frames)), domain_width=domain_width, domain_length=domain_length, movie=True)
+
+    # # save to .mat file:
+    # # dataset = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_180to360s.npy')
+    # data_dict = {'data': test_sim.trajectories}
+    # # dataset = test_sim.trajectories
+    # f_path = f'ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D1.5.mat'
+    # hdf5storage.savemat(f_path, data_dict, format='7.3', matlab_compatible=True, compress=True)
+    # # scipy.io.savemat(f_path, {'data': test_sim.trajectories, 'meta':{'ParticleTrackingParams':{'num_particles': f'{n_particles} seeded each frame', 'num_frames': '9000', 'dt': '0.02 sec', 'duration': '180 sec (start:180s end:360s)', 'diffusionCoefficient': f'{D_osrc} m^2/s', 'gridResolution': '0.0005 meter', 'ParticleReleasePoint': '(0, 0)', 'NumericalAdvectionMethod': 'Improved Euler'}, 
+    # #                                             'FlowfieldSimulationInfo':{'description':'2D grid turbulence Comsol model', 'source': 'modified from Fisher Plume manuscript Tootoonian et al., 2024', 'meanVelocity': '10 cm/s', 'xDomain': '[0, 0.75] meters', 'yDomain': '[-0.3, 0.3] meters'}, 
+    # #                                             'FileCreationInfo': {'creationDate': 'Aug 2024', 'createdBy': 'Elle Stark, EFD Lab, CU Boulder CEAE Dept', 'contact': 'elle.stark@colorado.edu or aaron.true@colorado.edu'}}})
 
 if __name__=='__main__':
     main()

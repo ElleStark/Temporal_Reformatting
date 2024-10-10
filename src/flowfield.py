@@ -126,6 +126,135 @@ class FlowField:
 
         self.velocity_fields = vfield_dict
 
+    def find_plot_esd(self, u_data, v_data):
+
+        # data = np.loadtxt('C:/Users/elles/Downloads/velocityfld_ascii.dat', skiprows=2)
+        # with open('C:/Users/elles/Downloads/velocityfld_ascii.dat', 'r') as f:
+        #     first_line = f.readline()
+        #     second_line = f.readline()
+        # print("shape of data = ",data.shape)
+
+        eps = 1e-50 # to void log(0)
+        N = int(u_data.shape[1] * u_data.shape[2])
+        amplsU = np.fft.fftn(u_data, axes=(1, 2))
+        amplsV = np.fft.fftn(v_data, axes=(1, 2))
+        # amplsU = np.mean(amplsU, axis=0)
+        # amplsV = np.mean(amplsV, axis=0)
+        # Lx = 0.01  # not sure if domain distance length scale
+        Lx = 1
+
+        EK_U  = np.abs(amplsU)**2*2/(N)
+        EK_V  = np.abs(amplsV)**2*2/(N)  
+        EK_U = np.mean(EK_U, axis=0)
+        EK_V = np.mean(EK_V, axis=0)
+        
+        EK_U = np.fft.fftshift(EK_U)
+        EK_V = np.fft.fftshift(EK_V)
+
+        # nx, ny = u_data.shape[1], u_data.shape[2]
+        # kx = np.fft.fftfreq(nx, d=dx).reshape(-1, 1)  # Wavenumbers in x
+        # ky = np.fft.fftfreq(ny, d=dx).reshape(1, -1)  # Wavenumbers in y
+        # k = np.sqrt(kx**2 + ky**2)  # Radial wavenumber
+
+        # # Flatten the arrays
+        # k_flat = k.flatten()
+        # EK_U_flat = EK_U.flatten()
+        # EK_V_flat = EK_V.flatten()
+
+        # # Define bins for wavenumbers
+        # num_bins = 100
+        # k_bins = np.linspace(0, np.max(k), num_bins)
+        # k_bin_centers = 0.5 * (k_bins[1:] + k_bins[:-1])
+
+        # # Compute radial average
+        # power_spectrum_u = np.zeros(num_bins - 1)
+        # power_spectrum_v = np.zeros(num_bins - 1)
+        # for i in range(num_bins -1):
+        #     mask = (k_flat >= k_bins[i]) & (k_flat < k_bins[i + 1])
+        #     if np.sum(mask) > 0:
+        #         power_spectrum_u[i] = np.sum(EK_U_flat[mask]) / np.sum(mask)
+        #         power_spectrum_v[i] = np.sum(EK_V_flat[mask]) / np.sum(mask)
+
+        # dk = np.diff(k_bins)  # Bin widths in k-space
+        # total_energy_u = np.sum(power_spectrum_u * dk)
+        # total_energy_v = np.sum(power_spectrum_v * dk)
+
+        # EK_avsphr = 0.5*(power_spectrum_u + power_spectrum_v)
+
+        # # Plot results
+        # plt.loglog(k_bin_centers, EK_avsphr, label='Power Spectrum')
+        # plt.loglog(k_bin_centers, power_spectrum_u, label='u component')
+        # plt.loglog(k_bin_centers, power_spectrum_v, label='v component')
+        # plt.loglog(k_bin_centers, k_bin_centers**(-5/3), '--', label='$k^{-5/3}$')
+        # plt.legend()
+        # plt.show()
+
+
+
+        ## Time avg of energy spectrum
+        ## t_avg_EK_U = np.mean(EK_U, axis=0)
+        ## t_avg_EK_V = np.mean(EK_V, axis=0)
+        ## x_avg_EK_U = np.mean(EK_U)
+
+
+        sign_sizex = np.shape(EK_U)[0]
+        sign_sizey = np.shape(EK_U)[1]
+
+        box_sidex = sign_sizex
+        box_sidey = sign_sizey
+
+        # box_radius = int(np.ceil((np.sqrt((box_sidex)**2+(box_sidey)**2))/2.)+1)
+        box_radius = int(np.ceil((np.sqrt((box_sidex)**2+(box_sidey)**2))/2.)+1)
+
+        centerx = int(box_sidex/2)
+        centery = int(box_sidey/2)
+                        
+        EK_U_avsphr = np.zeros(box_radius,)+eps ## size of the radius
+        EK_V_avsphr = np.zeros(box_radius,)+eps ## size of the radius
+
+        for i in range(box_sidex):
+            for j in range(box_sidey):            
+                wn =  int(np.round(np.sqrt((i-centerx)**2+(j-centery)**2)))
+                EK_U_avsphr[wn] = EK_U_avsphr [wn] + EK_U [i,j]
+                EK_V_avsphr[wn] = EK_V_avsphr [wn] + EK_V [i,j]
+            print(f'row{i} of {box_sidex} complete.')            
+
+        EK_avsphr = 1.5*(EK_U_avsphr + EK_V_avsphr)
+
+        plt.close()                        
+        fig = plt.figure()
+        plt.title("Kinetic Energy Spectrum")
+        plt.xlabel(r"k (wavenumber)")
+        plt.ylabel(r"TKE of the k$^{th}$ wavenumber")
+
+        realsize = len(np.fft.rfft(u_data[0,0,:]))
+        # plt.loglog(np.arange(0,realsize),((EK_avsphr[0:realsize] )),'k')
+        plt.loglog(np.arange(0,realsize),((EK_U_avsphr[0:realsize] )),'g')
+        plt.loglog(np.arange(0,realsize),((EK_V_avsphr[0:realsize] )),'b')
+        # plt.loglog(np.arange(realsize,len(EK_avsphr),1),((EK_avsphr[realsize:] )),'k--')
+        plt.loglog(np.arange(0,realsize),np.arange(0,realsize)**(-5/3),'r')
+        plt.show()
+
+        # realsize = len(np.fft.rfft(u_data[0,:,0]))
+        # # realsize=502
+        # k = np.arange(0,realsize)
+        # kx = np.round((2*np.pi/np.arange(0, realsize)))
+        # # plt.loglog(np.arange(0,realsize),((EK_avsphr[0:realsize] )),'k', label='combined')
+        # plt.loglog(np.arange(0,realsize),(np.abs(EK_U_avsphr[0:realsize])),'r', label='u component')
+        # # plt.loglog(np.asarray(kx[0:realsize]),(EK_U_avsphr[0:realsize])*2*np.pi*np.asarray(kx[0:realsize])**2,'r', label='u component')
+        # # plt.loglog(np.arange(0,realsize),((EK_V_avsphr[0:realsize] )),'b', label='v component')
+        # # plt.loglog(np.arange(realsize,len(EK_avsphr),1),((EK_avsphr[realsize:] )),'k--')
+        # # plt.loglog(np.arange(realsize,len(EK_U_avsphr),1),((EK_U_avsphr[realsize:] )),'r--')
+        # # # plt.loglog(np.arange(realsize,len(EK_V_avsphr),1),((EK_V_avsphr[realsize:] )),'b--')
+        # plt.loglog(np.arange(0, realsize), (np.arange(0, realsize)+eps)**(-5/3)*0.001, 'g')
+        # # plt.loglog(np.arange(0, realsize), (np.arange(0, realsize)+eps)**(-1)*0.001, 'orange')
+        # plt.legend()
+        # axes = plt.gca()
+        # axes.set_ylim([10**-14,10**-3])
+
+        # plt.show()
+
+
     def find_plot_psd(self, xlim, ylim, plot=True):
         """
         Computes vortex shedding frequency of cylinder array by computing the fundamental frequency at each location across the input, 
