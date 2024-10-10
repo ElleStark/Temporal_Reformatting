@@ -143,8 +143,8 @@ class FlowField:
         # Lx = 0.01  # not sure if domain distance length scale
         Lx = 1
 
-        EK_U  = np.abs(amplsU)**2*2/(N)
-        EK_V  = np.abs(amplsV)**2*2/(N)  
+        EK_U  = np.abs(amplsU)**2/(N)
+        EK_V  = np.abs(amplsV)**2/(N)  
         EK_U = np.mean(EK_U, axis=0)
         EK_V = np.mean(EK_V, axis=0)
         
@@ -219,20 +219,20 @@ class FlowField:
                 EK_V_avsphr[wn] = EK_V_avsphr [wn] + EK_V [i,j]
             print(f'row{i} of {box_sidex} complete.')            
 
-        EK_avsphr = 1.5*(EK_U_avsphr + EK_V_avsphr)
+        EK_avsphr = 0.5*(EK_U_avsphr + EK_V_avsphr)
 
         plt.close()                        
         fig = plt.figure()
-        plt.title("Kinetic Energy Spectrum")
+        plt.title("Far Field Kinetic Energy Spectrum: x[0.7, 0.71] y[-0.25, 0.25]m")
         plt.xlabel(r"k (wavenumber)")
         plt.ylabel(r"TKE of the k$^{th}$ wavenumber")
 
         realsize = len(np.fft.rfft(u_data[0,0,:]))
         # plt.loglog(np.arange(0,realsize),((EK_avsphr[0:realsize] )),'k')
-        plt.loglog(np.arange(0,realsize),((EK_U_avsphr[0:realsize] )),'g')
-        plt.loglog(np.arange(0,realsize),((EK_V_avsphr[0:realsize] )),'b')
+        plt.loglog(np.arange(0,realsize),((EK_U_avsphr[0:realsize] )),'k')
+        # plt.loglog(np.arange(0,realsize),((EK_V_avsphr[0:realsize] )),'b')
         # plt.loglog(np.arange(realsize,len(EK_avsphr),1),((EK_avsphr[realsize:] )),'k--')
-        plt.loglog(np.arange(0,realsize),np.arange(0,realsize)**(-5/3),'r')
+        plt.loglog(np.arange(0,realsize),np.arange(0,realsize)**(-5/3),'k--')
         plt.show()
 
         # realsize = len(np.fft.rfft(u_data[0,:,0]))

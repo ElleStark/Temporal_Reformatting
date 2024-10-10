@@ -11,7 +11,7 @@ import scipy.io
 
 def main():
     # Define data subset
-    x_lims = slice(0, 20)
+    x_lims = slice(1400, 1420)
     y_lims = slice(100, 1100)
     time_lims = slice(0, 9001)
 
@@ -82,7 +82,7 @@ def main():
     # Compute and plot energy spectrum
     u_flx = u_data - np.mean(u_data, axis=0)
     v_flx = v_data - np.mean(v_data, axis=0)
-    flow.find_plot_esd(u_data, v_data)
+    flow.find_plot_esd(u_flx, v_flx)
 
     # # Odor source properties
     # osrc_loc = [0, 0]  # location (m) relative to x_lims and y_lims subset of domain, source location at which to release particles
