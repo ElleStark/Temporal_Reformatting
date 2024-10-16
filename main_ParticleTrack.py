@@ -11,8 +11,8 @@ import scipy.io
 
 def main():
     # Define data subset
-    x_lims = slice(1400, 1420)
-    y_lims = slice(100, 1100)
+    x_lims = slice(0, 200)
+    y_lims = slice(200, 1000)
     time_lims = slice(0, 9001)
 
     # Import required data from H5 file
