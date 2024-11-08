@@ -223,16 +223,17 @@ class FlowField:
 
         plt.close()                        
         fig = plt.figure()
-        plt.title("Far Field Kinetic Energy Spectrum: x[0.7, 0.71] y[-0.25, 0.25]m")
-        plt.xlabel(r"k (wavenumber)")
-        plt.ylabel(r"TKE of the k$^{th}$ wavenumber")
+        plt.title("Far Field Kinetic Energy Spectrum: x=0.4, y[-0.25, 0.25]m")
+        plt.xlabel(r"f (Hz)")
+        plt.ylabel(r"TKE")
 
         realsize = len(np.fft.rfft(u_data[0,0,:]))
         # plt.loglog(np.arange(0,realsize),((EK_avsphr[0:realsize] )),'k')
         plt.loglog(np.arange(0,realsize),((EK_U_avsphr[0:realsize] )),'k')
         # plt.loglog(np.arange(0,realsize),((EK_V_avsphr[0:realsize] )),'b')
         # plt.loglog(np.arange(realsize,len(EK_avsphr),1),((EK_avsphr[realsize:] )),'k--')
-        plt.loglog(np.arange(0,realsize),np.arange(0,realsize)**(-5/3),'k--')
+        plt.loglog(np.arange(10,realsize),np.arange(10,realsize)**(-5/3),'b--')
+        plt.loglog(np.arange(1,10),np.arange(1,10)**(-3.0),'r--')
         plt.show()
 
         # realsize = len(np.fft.rfft(u_data[0,:,0]))

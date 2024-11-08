@@ -28,14 +28,15 @@ particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_exte
 
 # Convert x and y to cm if needed
 # particle_matrix[:, 1:3, :] = particle_matrix[:, 1:3, :] * 100
-mean_u = 10  # cm/s
+# mean_u = 10  # cm/s
 dt = 0.02
 p_num = 20  # particles released per timestep
 
 # Select times for plotting - for current log-log plotting setup, ALWAYS HAVE 0 AND FIRST TIMESTEP
-t_list = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5])
+# t_list = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5])
+t_list = np.array([0, 0.5, 0.707, 1, 1.414, 2, 2.828, 4])
 t_list_idx = (t_list / dt).astype(int) 
-n_tsteps = particle_matrix.shape[0] - t_list_idx[-1]
+n_tsteps = particle_matrix.shape[0] - t_list_idx[-1] - 250
 
 # Select initial separation times - each will be plotted on a separate line
 d_release_list = [0, 1, 2, 5, 10, 20, 30, 40, 50]
@@ -53,7 +54,7 @@ all_idx = 0
 
 for delta_release in d_release_list:
     idx = 0
-    batchelor_t = ((delta_release*dt * mean_u)**2)
+    # batchelor_t = ((delta_release*dt * mean_u)**2)
     n_particles = n_tsteps * 20
     for compute_t in t_list_idx:
         t=0
@@ -132,41 +133,48 @@ fig, ax = plt.subplots(figsize=(8, 6))
 # plt.ylabel('<r^2> compensated per Ouellette et al.')
 # plt.title('log-log scaling: initial separations 0 to 1 s')
 
-c_list = cmr.take_cmap_colors('cmr.sapphire', int(len(d_release_list)+6))
-
-for i in range(len(d_release_list)):
-    # i+=1
-    plt.loglog(t_list[1:], all_r2_list[i, 1:], label=f'{round(d_release_list[i]*dt, 2)}', color = c_list[i+6])
-    # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2 - 2*all_r_list[i]*all_r0_list[i], color='blue')
-    # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2, color='red')
-
-# Exponential fit at early times for particle separations for pairs with 0 initial separation 
-plt.loglog(t_list[1:8], 0.4*(all_r0_list[0]*np.exp(t_list[1:8]/0.07) - all_r0_list[0]), 'r--', linewidth=2)
-
-# t^3 fit for later times for particle separations for pairs with 0 initial separation, compensated by t^3
-# plt.loglog(t_list[1:], all_r2_list[0, 1:])
-# plt.scatter(t_list[1], g*epsilon* t_list[1]**3)
-# plt.scatter(t_list[-1], g*0.0001*t_list[-1]**3)
-
-# t^3 curve for later times
-# plt.loglog(t_list[4:], g*epsilon*t_list[4:]**(3/2), color='black')
-epsilon_list = 0.007*t_list[1:]**(-3/2)
-plt.loglog(t_list[4:], g*epsilon_list[3:]*t_list[4:]**3, '--', color='#80328c', linewidth=2)
-
-# # Expected fit for early times but large separations:
-plt.loglog(t_list[1:8], 0.007*t_list[1:8]**(2), 'k--', linewidth=2)
-# Better fit for our data:
-# plt.loglog(t_list[1:8], 0.8*epsilon*t_list[1:8]**(29/16), color='black')
-
-# Expected linear regime at end???
-# plt.loglog(t_list[-9:], 5*epsilon_list[-9:]*t_list[-9:]**(3/2), color='green')
+for i in range(len(t_list_idx)):
+    r2_avg = np.mean(all_r2_list[:, i])
+    # print(f'avg sq. separation for t={t_list[i]}: {r2_avg} m2')
+    omega_c = 0.1 * np.sqrt(np.log(1000)) / np.sqrt(2*r2_avg)
+    print(f'cutoff freq for t={t_list[i]}: {omega_c} (rad/s)')
 
 
-plt.xlabel('t (s)')
-plt.ylabel('<|r-r0|>^2')
-plt.title('log-log scaling: initial separations 0 to 1 s')
+# c_list = cmr.take_cmap_colors('cmr.sapphire', int(len(d_release_list)+6))
 
-plt.legend()
-plt.savefig('ignore/plots/pairseps_woverlay_0to1_loglog.png', dpi=300)
-plt.show()
+# for i in range(len(d_release_list)):
+#     # i+=1
+#     plt.loglog(t_list[1:], all_r2_list[i, 1:], label=f'{round(d_release_list[i]*dt, 2)}', color = c_list[i+6])
+#     # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2 - 2*all_r_list[i]*all_r0_list[i], color='blue')
+#     # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2, color='red')
+
+# # Exponential fit at early times for particle separations for pairs with 0 initial separation 
+# plt.loglog(t_list[1:8], 0.4*(all_r0_list[0]*np.exp(t_list[1:8]/0.07) - all_r0_list[0]), 'r--', linewidth=2)
+
+# # t^3 fit for later times for particle separations for pairs with 0 initial separation, compensated by t^3
+# # plt.loglog(t_list[1:], all_r2_list[0, 1:])
+# # plt.scatter(t_list[1], g*epsilon* t_list[1]**3)
+# # plt.scatter(t_list[-1], g*0.0001*t_list[-1]**3)
+
+# # t^3 curve for later times
+# # plt.loglog(t_list[4:], g*epsilon*t_list[4:]**(3/2), color='black')
+# epsilon_list = 0.007*t_list[1:]**(-3/2)
+# plt.loglog(t_list[4:], g*epsilon_list[3:]*t_list[4:]**3, '--', color='#80328c', linewidth=2)
+
+# # # Expected fit for early times but large separations:
+# plt.loglog(t_list[1:8], 0.007*t_list[1:8]**(2), 'k--', linewidth=2)
+# # Better fit for our data:
+# # plt.loglog(t_list[1:8], 0.8*epsilon*t_list[1:8]**(29/16), color='black')
+
+# # Expected linear regime at end???
+# # plt.loglog(t_list[-9:], 5*epsilon_list[-9:]*t_list[-9:]**(3/2), color='green')
+
+
+# plt.xlabel('t (s)')
+# plt.ylabel('<|r-r0|>^2')
+# plt.title('log-log scaling: initial separations 0 to 1 s')
+
+# plt.legend()
+# plt.savefig('ignore/plots/pairseps_woverlay_0to1_loglog.png', dpi=300)
+# plt.show()
 

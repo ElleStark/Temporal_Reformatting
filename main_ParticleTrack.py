@@ -11,7 +11,7 @@ import scipy.io
 
 def main():
     # Define data subset
-    x_lims = slice(0, 200)
+    x_lims = slice(795, 805)
     y_lims = slice(200, 1000)
     time_lims = slice(0, 9001)
 
