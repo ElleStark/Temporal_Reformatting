@@ -22,7 +22,16 @@ DEBUG = logger.debug
 
 
 # Load particle tracking data; original dimensions (time, features, particles) = (9001, 3, 180000); data type = float32
-particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
+
+# From numpy file:
+# particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
+
+# From mat file:
+fname = 'ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_0to180s_D1.5E-8.mat'
+with h5py.File(fname,'r') as f:
+    data = f.get('ParticleTracking/data')
+    particle_matrix = np.array(data) # For converting to a NumPy array
+particle_matrix = particle_matrix.transpose(2, 1, 0)
 
 ########## COMPUTE PAIRED PARTICLE SEPARATIONS OVER TIME ##########
 
@@ -33,13 +42,14 @@ dt = 0.02
 p_num = 20  # particles released per timestep
 
 # Select times for plotting - for current log-log plotting setup, ALWAYS HAVE 0 AND FIRST TIMESTEP
-# t_list = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5])
-t_list = np.array([0, 0.5, 0.707, 1, 1.414, 2, 2.828, 4])
+t_list = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.5, 0.707, 0.8, 1, 1.2, 1.414, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.828, 3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5])
+# t_list = np.array([0, 0.5, 0.707, 1, 1.414, 2, 2.828, 4])
 t_list_idx = (t_list / dt).astype(int) 
 n_tsteps = particle_matrix.shape[0] - t_list_idx[-1] - 250
 
 # Select initial separation times - each will be plotted on a separate line
 d_release_list = [0, 1, 2, 5, 10, 20, 30, 40, 50]
+d_release_list = [100, 110, 120, 130, 140, 150]
 
 r2_array = np.zeros((n_tsteps, p_num))
 # D_LL_array = np.zeros((n_tsteps, 20))
@@ -133,28 +143,29 @@ fig, ax = plt.subplots(figsize=(8, 6))
 # plt.ylabel('<r^2> compensated per Ouellette et al.')
 # plt.title('log-log scaling: initial separations 0 to 1 s')
 
+# COMPUTE AVERAGE SEPARATION FOR A GIVEN TIME
 for i in range(len(t_list_idx)):
     r2_avg = np.mean(all_r2_list[:, i])
-    # print(f'avg sq. separation for t={t_list[i]}: {r2_avg} m2')
-    omega_c = 0.1 * np.sqrt(np.log(1000)) / np.sqrt(2*r2_avg)
-    print(f'cutoff freq for t={t_list[i]}: {omega_c} (rad/s)')
+    print(f'low D avg sq. separation for t={t_list[i]}: {r2_avg} m2')
+    # omega_c = 0.1 * np.sqrt(np.log(1000)) / np.sqrt(2*r2_avg)
+    # print(f'cutoff freq for t={t_list[i]}: {omega_c} (rad/s)')
 
 
-# c_list = cmr.take_cmap_colors('cmr.sapphire', int(len(d_release_list)+6))
+c_list = cmr.take_cmap_colors('cmr.sapphire', int(len(d_release_list)+6))
 
-# for i in range(len(d_release_list)):
-#     # i+=1
-#     plt.loglog(t_list[1:], all_r2_list[i, 1:], label=f'{round(d_release_list[i]*dt, 2)}', color = c_list[i+6])
-#     # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2 - 2*all_r_list[i]*all_r0_list[i], color='blue')
-#     # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2, color='red')
+for i in range(len(d_release_list)):
+    # i+=1
+    plt.loglog(t_list[1:], all_r2_list[i, 1:], label=f'low D, {round(d_release_list[i]*dt, 2)}', color = c_list[i+6])
+    # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2 - 2*all_r_list[i]*all_r0_list[i], color='blue')
+    # plt.loglog(t_list[:], g*epsilon*t_list[:]**(3) + 2*all_r0_list[i]**2, color='red')
 
-# # Exponential fit at early times for particle separations for pairs with 0 initial separation 
+# Exponential fit at early times for particle separations for pairs with 0 initial separation 
 # plt.loglog(t_list[1:8], 0.4*(all_r0_list[0]*np.exp(t_list[1:8]/0.07) - all_r0_list[0]), 'r--', linewidth=2)
 
-# # t^3 fit for later times for particle separations for pairs with 0 initial separation, compensated by t^3
-# # plt.loglog(t_list[1:], all_r2_list[0, 1:])
-# # plt.scatter(t_list[1], g*epsilon* t_list[1]**3)
-# # plt.scatter(t_list[-1], g*0.0001*t_list[-1]**3)
+# t^3 fit for later times for particle separations for pairs with 0 initial separation, compensated by t^3
+# plt.loglog(t_list[1:], all_r2_list[0, 1:])
+# plt.scatter(t_list[1], g*epsilon* t_list[1]**3)
+# plt.scatter(t_list[-1], g*0.0001*t_list[-1]**3)
 
 # # t^3 curve for later times
 # # plt.loglog(t_list[4:], g*epsilon*t_list[4:]**(3/2), color='black')
@@ -166,15 +177,154 @@ for i in range(len(t_list_idx)):
 # # Better fit for our data:
 # # plt.loglog(t_list[1:8], 0.8*epsilon*t_list[1:8]**(29/16), color='black')
 
-# # Expected linear regime at end???
-# # plt.loglog(t_list[-9:], 5*epsilon_list[-9:]*t_list[-9:]**(3/2), color='green')
+# Expected linear regime at end???
+# plt.loglog(t_list[-9:], 5*epsilon_list[-9:]*t_list[-9:]**(3/2), color='green')
 
 
-# plt.xlabel('t (s)')
-# plt.ylabel('<|r-r0|>^2')
+########## COMPUTE PAIRED PARTICLE SEPARATIONS OVER TIME, CURVE 2 ##########
+
+# From numpy file:
+# particle_matrix = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_nanUpstream_0to180s_normal.npy')
+
+# From mat file:
+fname = 'ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_0to180s_D1.5_fixed.mat'
+with h5py.File(fname,'r') as f:
+    data = f.get('ParticleTracking/data')
+    particle_matrix = np.array(data) # For converting to a NumPy array
+particle_matrix = particle_matrix.transpose(2, 1, 0)
+
+
+
+# Convert x and y to cm if needed
+# particle_matrix[:, 1:3, :] = particle_matrix[:, 1:3, :] * 100
+# mean_u = 10  # cm/s
+dt = 0.02
+p_num = 20  # particles released per timestep
+
+# Select times for plotting - for current log-log plotting setup, ALWAYS HAVE 0 AND FIRST TIMESTEP
+t_list = np.array([0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.5, 0.707, 0.8, 1, 1.2, 1.414, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.828, 3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5])
+# t_list = np.array([0, 0.5, 0.707, 1, 1.414, 2, 2.828, 4])
+t_list_idx = (t_list / dt).astype(int) 
+n_tsteps = particle_matrix.shape[0] - t_list_idx[-1] - 250
+
+# Select initial separation times - each will be plotted on a separate line
+d_release_list = [0, 1, 2, 5, 10, 20, 30, 40, 50]
+d_release_list = [100, 110, 120, 130, 140, 150]
+
+r2_array = np.zeros((n_tsteps, p_num))
+# D_LL_array = np.zeros((n_tsteps, 20))
+r2_0 = np.zeros((n_tsteps, 20))
+r2_list = np.zeros(len(t_list))
+all_r2_list = np.zeros((len(d_release_list), len(r2_list)))
+all_r0_list = np.zeros((len(d_release_list)))
+n_particles_list = np.zeros((len(d_release_list)))
+# all_r_list = np.zeros((len(d_release_list)))
+# all_D_LL_list = np.zeros((len(d_release_list)))
+all_idx = 0
+
+for delta_release in d_release_list:
+    idx = 0
+    # batchelor_t = ((delta_release*dt * mean_u)**2)
+    n_particles = n_tsteps * 20
+    for compute_t in t_list_idx:
+        t=0
+        for t in range(n_tsteps-1):
+            t += 1
+            t0 = int(round(particle_matrix[0, 0, t*20 + 20*delta_release] / dt, 0))
+
+            # compute squared distance as delta x squared + delta y squared
+            separations = np.sqrt((particle_matrix[t0 + compute_t, 1, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 1, (t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)])**2 + (particle_matrix[t0 + compute_t, 2, (t*20-20):(t*20)] - particle_matrix[t0 + compute_t, 2, (t*20 + 20*delta_release):(t*20 + 20*delta_release +20)])**2)
+            r2_array[t, :] = separations
+
+            # if compute_t == t_list_idx[0]:
+            #     ########## D_LL(t=0) COMPUTATION ##########
+            #     # extract velocity field at each particle position
+            #     u_vals = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_0to180s_udata.npy')[t0, :]
+            #     v_vals = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D1.5_0to180s_vdata.npy')[t0, :]
+
+            #     # find difference in velocities for each particle pair
+            #     u_diffs = u_vals[(t*20-20):(t*20)] - u_vals[(t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)]  
+            #     v_diffs = v_vals[(t*20-20):(t*20)] - v_vals[(t*20 + 20*delta_release):(t*20 + 20*delta_release + 20)]
+
+            #     # find and square the longitudinal component
+            #     # store D_LL for all particle offsets
+            #     for particle_idx in range(D_LL_array.shape[1]):
+            #         D_LL_array[t, particle_idx] = (np.dot(np.array([x_diffs[particle_idx], y_diffs[particle_idx]]), np.array([u_diffs[particle_idx], v_diffs[particle_idx]])) / separations[particle_idx])**2
+        
+        if compute_t == t_list_idx[0]:
+            r2_0[:] = r2_array[:]
+        else:
+            r2_0 = r2_0
+
+        n_particles = np.min([n_particles, np.count_nonzero(~np.isnan(r2_array))])
+        r2_list[idx] = np.nanmean((r2_array - r2_0)**2)
+        # r2_list[idx] = np.nanmean(r2_array)**2
+        # r_list[idx] = np.nanmean(r2_array)
+        idx += 1
+    all_r2_list[all_idx, :] = r2_list
+    all_r0_list[all_idx] = np.nanmean(r2_0**2)
+    n_particles_list[all_idx] = n_particles
+    # all_r_list[all_idx] = np.nanmean(r_list)
+    # all_D_LL_list[all_idx] = np.nanmean(D_LL_array)
+    all_idx += 1
+
+
+print(n_particles_list)
+
+C2 = 2.13
+# epsilon = np.load('ignore/inputs/viscous_dissipation_extendedSim.npy')  # 1201 x 1501 matrix of vals
+# epsilon = 0.001015  # m^2/s^3, for simplicity start with domain average
+# epsilon = 0.0025
+epsilon = 0.006728  # m^2/s^3, first 0.05 m
+epsilon_end = 0.000165  # m^2/s^3, last 0.05 m
+nu = 1.5 * 10**(-5)  # kinematic viscosity, m/s
+t_eta = 0.1216  # s, kolmogorov microscale in time, entire domain
+g = 0.5  # Richardson constant
+# t_eta = 0.0472  # first 0.05 m
+
+
+# t2_array = t_list_10 ** 2
+# t3_array =t_list_10 ** 3
+
+##fig, ax = plt.subplots(figsize=(8, 6))
+
+# for i in range(len(d_release_list)-1):
+#     i+=1
+    # Normalize r squared according to Ouellette et al., 2006
+    # normalized_r2 = all_r2_list[i, :]/ ((11/3*C2*(epsilon*all_r0_list[i])**(2/3))*t_eta**2)
+    # Normalize r according to Tan & Ni 2022
+#     t_zero = epsilon**(-1/3)*all_r0_list[i]**(2/3)
+#     D_LL = all_D_LL_list[i]
+#     normalized_r2 = all_r2_list[i, :]/ (t_zero**2 * D_LL)
+#     plt.loglog(t_list[1:]/t_eta, normalized_r2[1:], label=f'p_sep: {round(d_release_list[i]*dt, 2)}')
+# plt.loglog(t_list[1:]/t_zero, (t_list[1:]/t_zero)**2, color='black')
+
+# plt.xlabel('t/t_microscale')
+# plt.ylabel('<r^2> compensated per Ouellette et al.')
 # plt.title('log-log scaling: initial separations 0 to 1 s')
 
-# plt.legend()
-# plt.savefig('ignore/plots/pairseps_woverlay_0to1_loglog.png', dpi=300)
-# plt.show()
+# COMPUTE AVERAGE SEPARATION FOR A GIVEN TIME
+for i in range(len(t_list_idx)):
+    r2_avg = np.mean(all_r2_list[:, i])
+    print(f'high D avg sq. separation for t={t_list[i]}: {r2_avg} m2')
+    # omega_c = 0.1 * np.sqrt(np.log(1000)) / np.sqrt(2*r2_avg)
+    # print(f'cutoff freq for t={t_list[i]}: {omega_c} (rad/s)')
+
+
+c_list = cmr.take_cmap_colors('cmr.amber', int(len(d_release_list)+6))
+
+for i in range(len(d_release_list)):
+    # i+=1
+    plt.loglog(t_list[1:], all_r2_list[i, 1:], '--', label=f'high D, {round(d_release_list[i]*dt, 2)}', color = c_list[i+6])
+
+
+
+
+plt.xlabel('t (s)')
+plt.ylabel('<|r-r0|>^2')
+plt.title('log-log scaling: initial separations 2 to 3 s')
+
+plt.legend()
+plt.savefig('ignore/plots/pairseps_Dlowandhigh_independent_2to3_loglog.png', dpi=300)
+plt.show()
 

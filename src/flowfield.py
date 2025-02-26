@@ -5,8 +5,9 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-from scipy.fft import fft, fftfreq
+from scipy.fft import fft2, fftshift
 import scipy.signal as sp
+from scipy.io import savemat
 
 class FlowField:
 
@@ -74,7 +75,7 @@ class FlowField:
         xmesh_vec = self.xmesh_uv[0, :]
 
         # read in u and v data from h5
-        f_name = 'D:/singlesource_2d_extended/180to360/Re100_0_5mm_50Hz_singlesource_2d_180to360s.h5'
+        f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
         with h5py.File(f_name, 'r') as f:
             u_data = f.get('Flow Data/u')[frame, self.xlims, self.ylims].T
             v_data = f.get('Flow Data/v')[frame, self.xlims, self.ylims].T
@@ -134,7 +135,7 @@ class FlowField:
         #     second_line = f.readline()
         # print("shape of data = ",data.shape)
 
-        eps = 1e-50 # to void log(0)
+        eps = 1e-50 # to avoid log(0)
         N = int(u_data.shape[1] * u_data.shape[2])
         amplsU = np.fft.fftn(u_data, axes=(1, 2))
         amplsV = np.fft.fftn(v_data, axes=(1, 2))
@@ -219,21 +220,31 @@ class FlowField:
                 EK_V_avsphr[wn] = EK_V_avsphr [wn] + EK_V [i,j]
             print(f'row{i} of {box_sidex} complete.')            
 
-        EK_avsphr = 0.5*(EK_U_avsphr + EK_V_avsphr)
+        # EK_avsphr = 0.5*(EK_U_avsphr + EK_V_avsphr)
+        EK_avsphr = EK_U_avsphr
 
         plt.close()                        
         fig = plt.figure()
-        plt.title("Far Field Kinetic Energy Spectrum: x=0.4, y[-0.25, 0.25]m")
-        plt.xlabel(r"f (Hz)")
-        plt.ylabel(r"TKE")
+        plt.title("Sensor 1 streamwise power spectrum: x=[0, 0.1], y[-0.20, 0.20]m")
+        plt.xlabel(r"omega (rad/s)")
+        plt.ylabel(r"Normalized Power")
+
+        norm_power = (EK_avsphr-np.min(EK_avsphr)) / (np.max(EK_avsphr) - np.min(EK_avsphr))
+        savemat('ignore/spectra_data/Pspectrum_normalized_det1_wide_omega_udir.mat', {'det1_flowSpectrum_wide_udir': EK_avsphr})
 
         realsize = len(np.fft.rfft(u_data[0,0,:]))
-        # plt.loglog(np.arange(0,realsize),((EK_avsphr[0:realsize] )),'k')
-        plt.loglog(np.arange(0,realsize),((EK_U_avsphr[0:realsize] )),'k')
+        # plt.semilogy(np.arange(0,50),((EK_avsphr[0:50] )),'k')
+        plt.semilogy(0.1*np.arange(0,50),((norm_power[0:50] )),'k')
+        plt.semilogy(0.1*np.arange(5, 25), 10*((np.arange(5, 25))**(-10/3)), 'r--')
+        plt.semilogy(0.1*np.arange(30, 50), 0.03*((np.arange(30, 50))**(-5/3)), 'b--')
+        # plt.loglog(np.arange(0,realsize),((norm_power[0:realsize] )),'k')
         # plt.loglog(np.arange(0,realsize),((EK_V_avsphr[0:realsize] )),'b')
         # plt.loglog(np.arange(realsize,len(EK_avsphr),1),((EK_avsphr[realsize:] )),'k--')
-        plt.loglog(np.arange(10,realsize),np.arange(10,realsize)**(-5/3),'b--')
-        plt.loglog(np.arange(1,10),np.arange(1,10)**(-3.0),'r--')
+        # plt.loglog(np.arange(40,realsize),np.arange(40,realsize)**(-5/3),'b--')
+        # plt.loglog(np.arange(5,25),10**3*np.arange(5,25)**(-10/3),'r--')
+        # plt.vlines(0.1*np.log10(2*np.pi/(0.22*0.1)), 10**(-5), 10, 'k', 'dashed')
+        plt.ylim(10**(-5), 10)
+        plt.savefig('ignore/plots/spectrum_sensor1_wide_omega_udir.png', dpi=600)
         plt.show()
 
         # realsize = len(np.fft.rfft(u_data[0,:,0]))
@@ -256,119 +267,64 @@ class FlowField:
         # plt.show()
 
 
-    def find_plot_psd(self, xlim, ylim, plot=True):
+    def find_plot_psd(self, u, v, dx, dy, U, dt):
         """
-        Computes vortex shedding frequency of cylinder array by computing the fundamental frequency at each location across the input, 
-        based on the Direct Fourier Transform of the time series of u velocity. 
-        :param xlim: array [min, max] of index for x limits
-        :param ylim: array [min, max] of index for y limits
-        :param plot: boolean, if True, plots fft for random sample of 50 locations
+        Compute the power spectrum of a velocity field as a function of angular frequency.
+
+        Parameters:
+            u (ndarray): 2D array of velocity in the x-direction.
+            v (ndarray): 2D array of velocity in the y-direction.
+            dx (float): Spatial resolution in the x-direction.
+            dy (float): Spatial resolution in the y-direction.
+            U (float): Convection speed (used to relate wavenumbers to angular frequency).
+
+        Returns:
+            omega (ndarray): 1D array of angular frequencies.
+            power_spectrum (ndarray): 1D array of the power spectrum as a function of omega.
         """
-        # Define number of sample points N and sample spacing T
-        N = len(self.u_data[0, 0, :])
-        T = self.dt_uv
-        nx = xlim[1] - xlim[0]
-        ny = ylim[1] - ylim[0]
-
-        xidxs = list(range(xlim[0], xlim[1]))
-        yidxs = list(range(ylim[0], ylim[1]))
-
-        # fft_list = np.empty((nx*ny, 1))
-        fft_list = []
-        # at each point, compute Direct Fourier Transform using numpy's fft() function
-        for y in yidxs:
-            for x in xidxs:
-                u_timeseries = self.u_data[y, x, :]
-                u_fluct = u_timeseries - np.mean(u_timeseries)
-                # Compute autocorrelation coefficients for u velocity
-                # r_u = np.correlate(u_fluct, u_fluct, mode='full')
-                # r_u = r_u[r_u.size//2:]        
                 
-                # u_freq = fft(u_fluct)
-                # f, t, Zxx = stft(u_fluct, fs=0.02, nperseg=50, scaling='psd')
-                # window = sp.windows.boxcar(50)
-                # hop = 25
-                fs = 50  # sampling frequency (Hz)
-                # scale_to = 'psd'
-                # SFT = sp.ShortTimeFFT(window, hop, fs=fs, scale_to = scale_to)
-                # Sx = SFT.stft(u_fluct)  # Perform the STFT
-
-                # f, Pxx_den = sp.periodogram(u_fluct, fs, scaling='density')
-                # freqs = np.linspace(0.001, 100, 10000)
-                ps = np.abs(np.fft.fft(u_fluct))**2
-                timestep = 1/50
-                freqs = np.fft.fftfreq(u_fluct.size, timestep)
-                idx = np.argsort(freqs)
-
-                ILS_guess = 0.015  # integral length scale, meters
-                # u_avg = np.mean(u_timeseries)  # average velocity, m/s 
-                u_avg = 0.10  # m/s
-                fL = freqs * ILS_guess / u_avg # normalized frequencies
-                vonkarman = (4*fL) / ((1 + 70.78*(fL**2))**(5/6)) 
-                # plt.semilogy(f, Pxx_den)
-                # plt.scatter(fL, Pxx_den * f / u_avg**2, label='modeled')
-                plt.plot(ps / fs * freqs / np.var(u_fluct)**2, label='modeled')
-                # plt.plot(freqs[idx], ps[idx] * freqs[idx] / np.var(u_fluct)**2, label='modeled')
-                plt.plot(vonkarman, color='r', label='Von Karman fit')
-                # plt.psd(u_timeseries, NFFT=150, Fs=fs, scale_by_freq=True, label='PSD')
-                plt.yscale('log')
-                plt.xscale('log')
-                # plt.xlim(0, 100)
-                # plt.ylim(10**(-10), 1)
-                plt.xlabel('normalized frequency (Hz)')
-                plt.ylabel('PSD [V**2/Hz]')
-                plt.legend()
-                plt.show()
-
-                # df, dt = f[1] - f[0], t[1] - t[0]
-                # psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df
-                # psd = np.sum(Zxx.real**2 + Zxx.imag**2, axis=0) * df * dt
-                # u_freq_power = np.square(fft(u_fluct))
-                # fft_list.append(u_freq)
-                
-                # QC: time series of u data
-                # plt.close()
-                # fig, ax = plt.subplots(figsize=(12, 5))
-                # plt.plot(u_fluct)
-                # plt.savefig('ignore/tests/stft_u_timeseries473.png', dpi=300)
-
-        # x_vals = np.linspace(0.0, N*T, N, endpoint=False)
-        # x_freq = fftfreq(N, T)[:N//2]
-
-        # if plot:
-
-        #     # TEST PLOT FROM SCIPY EXAMPLE
-        #     fig1, ax1 = plt.subplots(figsize=(6., 4.))  # enlarge plot a bit
-        #     t_lo, t_hi = SFT.extent(N)[:2]  # time range of plot
-        #     ax1.set(xlabel=f"Time $t$ in seconds ({SFT.p_num(N)} slices, " +
-        #                 rf"$\Delta t = {SFT.delta_t:g}\,$s)",
-        #             ylabel=f"Freq. $f$ in Hz ({SFT.f_pts} bins, " +
-        #                 rf"$\Delta f = {SFT.delta_f:g}\,$Hz)",
-        #             xlim=(t_lo, t_hi))
-
-        #     im1 = ax1.imshow(abs(Sx), origin='lower', aspect='auto',
-        #                     extent=SFT.extent(N), cmap='viridis')
-        #     # ax1.plot(t_x, f_i, 'r--', alpha=.5, label='$f_i(t)$')
-        #     fig1.colorbar(im1, label="Magnitude $|S_x(t, f)|$")
-
-        #     # Shade areas where window slices stick out to the side:
-        #     for t0_, t1_ in [(t_lo, SFT.lower_border_end[0] * SFT.T),
-        #                     (SFT.upper_border_begin(N)[0] * SFT.T, t_hi)]:
-        #         ax1.axvspan(t0_, t1_, color='w', linewidth=0, alpha=.2)
-        #     for t_ in [0, N * SFT.T]:  # mark signal borders with vertical line:
-        #         ax1.axvline(t_, color='y', linestyle='--', alpha=0.5)
-        #     ax1.legend()
-        #     fig1.tight_layout()
-        #     plt.show()
-            # plt.close()
-            # plt.plot(psd)
-            # plt.savefig('ignore/tests/psd_test.png', dpi=300)
-
-            # plt.plot(x_freq, 2.0/N * np.abs(u_freq[:N//2]))
-            # # plt.plot(x_freq, 2.0/N * np.abs(u_freq_power[:N//2]), alpha=0.5)
-            # plt.xlim(0, 5)
-            # plt.savefig('ignore/tests/fft_test473.png', dpi=300)
-                
+        # Compute 3D FFT (time, x, y)
+        fft_u = np.fft.fftn(u)
+        fft_v = np.fft.fftn(v)
+        
+        # Compute power spectrum for each component
+        power_u = np.abs(fft_u)**2
+        power_v = np.abs(fft_v)**2
+        
+        # Combine power spectra
+        total_power = power_u + power_v
+        
+        # Shift zero frequencies to the center
+        total_power = fftshift(total_power, axes=(0, 1, 2))
+        
+        # Get dimensions of the subset
+        nt, nx, ny = u.shape
+        
+        # Compute temporal and spatial wavenumbers
+        kx = np.fft.fftfreq(nx, dx) * 2 * np.pi
+        ky = np.fft.fftfreq(ny, dy) * 2 * np.pi
+        omega_t = np.fft.fftfreq(nt, dt) * 2 * np.pi  # Angular frequency (temporal)
+        
+        kx, ky, omega_t = np.meshgrid(kx, ky, omega_t, indexing='ij')
+        
+        # Compute total angular frequency
+        k = np.sqrt(kx**2 + ky**2)
+        omega = U * k + omega_t  # Combine spatial and temporal contributions
+        
+        # Flatten arrays for binning
+        omega_flat = omega.ravel()
+        power_flat = total_power.ravel()
+        
+        # Bin the power spectrum by angular frequency
+        omega_bins = np.linspace(0, omega_flat.max(), 100)  # Define bins
+        bin_centers = 0.5 * (omega_bins[1:] + omega_bins[:-1])
+        power_binned = np.zeros(len(bin_centers))
+        
+        for i in range(len(bin_centers)):
+            in_bin = (omega_flat >= omega_bins[i]) & (omega_flat < omega_bins[i + 1])
+            power_binned[i] = np.sum(power_flat[in_bin])
+        
+        return bin_centers, power_binned
 
                 
 

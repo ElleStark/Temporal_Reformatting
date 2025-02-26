@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import logging
 import pandas as pd
+import pickle
+from scipy.optimize import curve_fit
 import time
 import cmasher as cmr
 
@@ -140,16 +142,14 @@ def main():
 
     # Load expanded particle tracking data if already computed
     # Numpy file columns (in this order): release time, x, y, strain (at each time step) = (9001, 4, 180000)
+
+
+
+
     # file_name = 'ignore/ParticleTrackingData/ParticleStrains_Extendedsim_n20_t0to180_D1.5.npy'
     # particles_w_strain = np.load(file_name)
     # n_tsteps, n_features, n_particles = particles_w_strain.shape
     # dt = 0.02
-
-    # # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
-    # det_x = 0.45  # downstream detector distance (m)
-    # det_y = 0  # cross-stream detector position (m, center of detector)
-    # det_width = 0.01  # detector width, streamwise (m)
-    # det_height = 0.0465  # detector height, cross-stream (m)
 
     # # Flatten and mask particle data
     # particles_flat = particles_w_strain.transpose(1, 0, 2)
@@ -171,53 +171,90 @@ def main():
     # x_coords = valid_particles[1, :]
     # y_coords = valid_particles[2, :]
 
-    # # Define conditions for sensor detection
-    # det_condition = ((det_x <= x_coords) & (x_coords <= (det_x + det_width))) & (((det_y - det_height / 2) <= y_coords) & (y_coords <= (det_y + det_height / 2)))
 
-    # cond_array = np.full(n_tsteps * n_particles, False)
-    # cond_array[valid_mask] = np.where(det_condition, det_condition, False)
-    # cond_array = cond_array.reshape(n_tsteps, n_particles).T  # Now 60000 x 3000 array of T/F, or NAN
-    # # first_detect = np.zeros_like(cond_array, dtype=bool)
-    # # first_detect_time = np.arange(len(cond_array)), cond_array.argmax(axis=1)
-    # first_detect_idxs = cond_array.argmax(axis=1)
+    # # List of detector properties for looped version
+    # det_x_vals = [0.05, 0.0707, 0.1, 0.1414, 0.2, 0.2828, 0.4]
+    # det_height_vals = [0.015, 0.01842, 0.02191, 0.02605, 0.0310, 0.0368, 0.04382]  # Computed as 4*sqrt(2*1.5*ts)*0.01, where ts is avg time to sensor, to match JDV heights
 
-    # # Vector of particle id numbers
-    # particle_ids = np.linspace(0, n_particles-1, n_particles, dtype=int)
-    # # extract release times and cumulative strain from particle matrix
-    # release_times = particles_w_strain[0, 0, :].round(2)
-    # # release_idxs = ((release_times / dt).astype(int))
-    # travel_times = (first_detect_idxs - ((release_times / dt).astype(int))) * dt
+    # # Dictionary to store avg speed values at each location
+    # avg_u_vals = {'det 1': None, 'det 2': None, 'det 3': None, 'det 4': None, 'det 5': None, 'det 6': None, 'det 7': None}
+    # avg_totvel_vals = {'det 1': None, 'det 2': None, 'det 3': None, 'det 4': None, 'det 5': None, 'det 6': None, 'det 7': None}
 
-    # # average strain from release time to first detection for each detected particle
-    # # First, create a mask to select the appropriate slices for each particle
-    # mask = np.arange(particles_w_strain.shape[0])[:, np.newaxis]  # shape (timesteps, 1)
-    # # Create a boolean mask for each particle's range
-    # bool_mask = (mask >= ((release_times / dt).astype(int))) & (mask < first_detect_idxs)
-    # # Calculate the average strain across the valid range for each particle
-    # strains = np.where(bool_mask[:, :], particles_w_strain[:, 3, :], np.nan)
-    # # Now compute the mean along the time dimension, ignoring the NaNs
-    # avg_strains = np.nanmean(strains, axis=0)
-    # cum_strains = np.nansum(strains, axis=0)
-    # max_strains = np.nanmax(strains, axis=0)
+    # for i in range(len(det_x_vals)):
+    #     # Compute travel times of each particle to detector (sensor); keep only particles that reach sensor
+    #     det_x = det_x_vals[i]  # downstream detector distance (m)
+    #     det_y = 0  # cross-stream detector position (m, center of detector)
+    #     det_width = 0.01  # detector width, streamwise (m)
+    #     det_height = det_height_vals[i]  # detector height, cross-stream (m)
 
-    # # Compute length of trajectories
-    # traj_coords_x = np.where(bool_mask[:, :], particles_w_strain[:, 1, :], np.nan)
-    # traj_x_prev = np.roll(traj_coords_x, 1, axis=0)
-    # traj_coords_y = np.where(bool_mask[:, :], particles_w_strain[:, 2, :], np.nan)
-    # traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
-    # traj_length = np.nansum(1000*(np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
-    # strains_distavg = cum_strains / traj_length
-    # t2_avg_strain = cum_strains / (travel_times)**2
-    # # t5_avg_strain = cum_strains / (travel_times)**5
 
-    # # Compute average speed of particles
-    # speed = traj_length / travel_times  # mm/sec
-    # horiz_speed = 450 / travel_times
+    #     # Define conditions for sensor detection
+    #     det_condition = ((det_x <= x_coords) & (x_coords <= (det_x + det_width))) & (((det_y - det_height / 2) <= y_coords) & (y_coords <= (det_y + det_height / 2)))
 
-    # # Create mask for detected particles based on detect time not equal to zero
-    # detected_idxs = np.where((first_detect_idxs != 0) & (traj_length >=525) & (traj_length <=575), True, False)
+    #     cond_array = np.full(n_tsteps * n_particles, False)
+    #     cond_array[valid_mask] = np.where(det_condition, det_condition, False)
+    #     cond_array = cond_array.reshape(n_tsteps, n_particles).T  # Now 60000 x 3000 array of T/F, or NAN
+    #     # first_detect = np.zeros_like(cond_array, dtype=bool)
+    #     # first_detect_time = np.arange(len(cond_array)), cond_array.argmax(axis=1)
+    #     first_detect_idxs = cond_array.argmax(axis=1)
+
+    #     # Vector of particle id numbers
+    #     particle_ids = np.linspace(0, n_particles-1, n_particles, dtype=int)
+    #     # extract release times and cumulative strain from particle matrix
+    #     release_times = particles_w_strain[0, 0, :].round(2)
+    #     # release_idxs = ((release_times / dt).astype(int))
+    #     travel_times = (first_detect_idxs - ((release_times / dt).astype(int))) * dt
+
+    #     # average strain from release time to first detection for each detected particle
+    #     # First, create a mask to select the appropriate slices for each particle
+    #     mask = np.arange(particles_w_strain.shape[0])[:, np.newaxis]  # shape (timesteps, 1)
+    #     # Create a boolean mask for each particle's range
+    #     bool_mask = (mask >= ((release_times / dt).astype(int))) & (mask < first_detect_idxs)
+    #     # # Calculate the average strain across the valid range for each particle
+    #     # strains = np.where(bool_mask[:, :], particles_w_strain[:, 3, :], np.nan)
+    #     # # Now compute the mean along the time dimension, ignoring the NaNs
+    #     # avg_strains = np.nanmean(strains, axis=0)
+    #     # cum_strains = np.nansum(strains, axis=0)
+    #     # max_strains = np.nanmax(strains, axis=0)
+
+    #     # Compute length of trajectories
+    #     traj_coords_x = np.where(bool_mask[:, :], particles_w_strain[:, 1, :], np.nan)
+    #     traj_x_prev = np.roll(traj_coords_x, 1, axis=0)
+    #     traj_coords_y = np.where(bool_mask[:, :], particles_w_strain[:, 2, :], np.nan)
+    #     traj_y_prev = np.roll(traj_coords_y, 1, axis=0)
+    #     traj_length = np.nansum(1000*(np.sqrt((traj_coords_x-traj_x_prev)**2 + (traj_coords_y-traj_y_prev)**2)), axis=0)
+    #     # strains_distavg = cum_strains / traj_length
+    #     # t2_avg_strain = cum_strains / (travel_times)**2
+    #     # # t5_avg_strain = cum_strains / (travel_times)**5
+
+    #     # Compute average speed of particles
+    #     speed = traj_length/ 1000 / travel_times  # m/sec
+    #     horiz_speed = det_x_vals[i] / travel_times
+
+    #     # Create mask for detected particles based on detect time not equal to zero
+    #     # detected_idxs = np.where((first_detect_idxs != 0) & (traj_length >=525) & (traj_length <=575), True, False)
+    #     detected_idxs = np.where((first_detect_idxs != 0), True, False)
+
+    #     avg_totvel_vals[f'det {i+1}'] = speed[detected_idxs]
+    #     avg_u_vals[f'det {i+1}'] = horiz_speed[detected_idxs]
   
-    # # Dataframe of detected particles
+    # # Save dictionaries of velocities
+    # with open('ignore/tests/avg_total_vel.pkl', 'wb') as fp:
+    #     pickle.dump(avg_totvel_vals, fp)
+    # with open('ignore/tests/avg_u_vel.pkl', 'wb') as fp:
+    #     pickle.dump(avg_u_vals, fp)
+
+
+
+
+
+    # Load dictionaries of average velocities if already saved
+    # with open('ignore/tests/avg_total_vel.pkl', 'rb') as fp:
+    #     avg_totvel_vals = pickle.load(fp)
+    with open('ignore/tests/avg_u_vel.pkl', 'rb') as fp:
+        avg_u_vals = pickle.load(fp)
+    
+    # Dataframe of detected particles
     # particles_df = pd.DataFrame({'Particle_ID': particle_ids[detected_idxs], 'Release_t': release_times[detected_idxs], 'Detect_t': first_detect_idxs[detected_idxs], 
     #                             'Travel_t': travel_times[detected_idxs]**2, 'travel_dist': traj_length[detected_idxs], 'avg_horiz_speed': horiz_speed[detected_idxs], 't2_avg_strain': t2_avg_strain[detected_idxs], 
     #                             'dist_avg_strain': strains_distavg[detected_idxs], 'cumulative_strain': cum_strains[detected_idxs], 'max_strain': max_strains[detected_idxs]})
@@ -230,7 +267,58 @@ def main():
     # plt.xlabel('travel time^2 (s)')
     # plt.title('travel length vs travel time, traj length = 525 to 575')
     # plt.show()
-    
+
+    # 1D PLOTS OF AVERAGE VELOCITY: HORIZONTAL AND TOTAL
+    # for i in range(len(det_x_vals)):
+    #     plt.hist(avg_totvel_vals[f'det {i+1}'])
+    #     plt.show()
+
+    mean_ic = [0.5, 0.707, 1, 1.414, 2, 2.828, 4]
+
+    for i in range(7):
+        # data = (avg_u_vals[f'det {i+1}'])
+        data = np.log(avg_u_vals[f'det {i+1}'])
+
+        # Set bin width using Freedman-Diaconis rule (https://en.wikipedia.org/wiki/Freedman%E2%80%93Diaconis_rule)
+        # q1 = np.percentile(data, 25)
+        # q3 = np.percentile(data, 75)
+        # iqr = q3 - q1
+        # bin_width = 2 * iqr / len(data)**(1/3)
+        # nbins = (max(data) - min(data)) / bin_width
+
+        # Fit Gaussian function
+        def gaussian(x, amplitude, mean, std):
+            return amplitude * np.exp(-((x - mean) ** 2) / (2 * std ** 2))
+        
+        nbins = 20
+        hist, bin_edges = np.histogram(data, bins=nbins, density=True)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        # plt.hist(data, bins=nbins, density=True, alpha=0.6)
+
+        # Fit the Gaussian to the histogram
+        p0 = [0.05, mean_ic[i], 1]  # Initial parameter guess: [amplitude, mean, stddev]
+        params, covariance = curve_fit(gaussian, bin_centers, hist, p0=p0)
+        A_fit, mu_fit, sigma_fit = params
+
+        # Plot the fitted Gaussian
+        # x = np.linspace(min(data), max(data), 100)
+        x_fit = np.linspace(bin_edges[0], bin_edges[-1], 500)
+        y_fit = gaussian(x_fit, A_fit, mu_fit, sigma_fit)
+        plt.hist(data, bins=nbins, density=True, alpha=0.6, color='gray', label='Data histogram')
+        plt.plot(x_fit, y_fit, color='red', linewidth=2, label=f'Gaussian fit\n$A={A_fit:.2f}$, $\mu={mu_fit:.2f}$, $\sigma={sigma_fit:.2f}$')
+        plt.xlabel('mean horizontal velocity, m/s')
+        plt.ylabel('Density')
+        plt.title(f'Histogram and Gaussian Fit, Sensor {i+1}')
+        plt.legend()
+        plt.show()
+
+        # Diagonal elements of the covariance matrix are the variances
+        # param_errors = np.sqrt(np.diag(covariance))
+        # print("Fitted parameters:")
+        # print(f"A = {A_fit:.2f} ± {param_errors[0]:.2f}")
+        # print(f"mu = {mu_fit:.2f} ± {param_errors[1]:.2f}")
+        # print(f"sigma = {sigma_fit:.2f} ± {param_errors[2]:.2f}")
+
 
     ### JOINTLY DETECTED PARTICLES ANALYSIS #########
 
