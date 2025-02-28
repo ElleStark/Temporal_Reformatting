@@ -4,7 +4,7 @@
 
 cd('C:/Users/elles/Documents/CU_Boulder/Fluids_Research/TemporalReformatting/Code/TwoParticleSims_TempReform/')
 
-filedata = load('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D1.5.mat');
+filedata = load('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D0.0015.mat');
 simdata = filedata.data;
 
 ParticleTracking = struct;
@@ -18,18 +18,18 @@ params.num_particles = '20 seeded each frame';
 params.num_frames = '9000';
 params.dt = '0.02 sec';
 params.duration = '180 sec';
-params.diffusionCoefficient = '1.5e-05 m^2/s';
+params.diffusionCoefficient = '1.5e-08 m^2/s';
 params.gridResolution = '0.0005 meter';
 params.ParticleReleasePoint = '(0,0)';
 params.NumericalAdvectionMethod = 'ImprovedEuler';
 
 siminfo.description = '2D grid turbulence Comsol model';
-siminfo.source = 'Expanded domain of Tootoonian et al., 2024 simulations';
+siminfo.source = 'Expanded domain of Tootoonian et al., 2025 simulations';
 siminfo.meanVelocity = '10 cm/s';
 siminfo.xDomain = '[0, 0.75] meters';
 siminfo.yDomain = '[-0.3, 0.3] meters';
 
-fileinfo.creationDate = 'Aug 2024';
+fileinfo.creationDate = 'January 2025';
 fileinfo.createdBy = 'Elle Stark, EFD Lab, CU Boulder CEAE Dept';
 fileinfo.contact = 'elle.stark@colorado.edu or aaron.true@colorado.edu';
 
@@ -39,5 +39,5 @@ metadata.FileCreationInfo = fileinfo;
 
 ParticleTracking.meta = metadata;
 
-save('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_180to360s_D1.5_wMeta.mat', 'ParticleTracking', '-v7.3')
+save('ignore/ParticleTrackingData/ParticleTracking_sim_extended_n20_0to180s_D1.5E-8_wMeta.mat', 'ParticleTracking', '-v7.3')
 
