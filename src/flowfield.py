@@ -135,22 +135,8 @@ class FlowField:
         #     second_line = f.readline()
         # print("shape of data = ",data.shape)
 
-        eps = 1e-50 # to avoid log(0)
-        N = int(u_data.shape[1] * u_data.shape[2])
-        amplsU = np.fft.fftn(u_data, axes=(1, 2))
-        amplsV = np.fft.fftn(v_data, axes=(1, 2))
-        # amplsU = np.mean(amplsU, axis=0)
-        # amplsV = np.mean(amplsV, axis=0)
-        # Lx = 0.01  # not sure if domain distance length scale
-        Lx = 1
 
-        EK_U  = np.abs(amplsU)**2/(N)
-        EK_V  = np.abs(amplsV)**2/(N)  
-        EK_U = np.mean(EK_U, axis=0)
-        EK_V = np.mean(EK_V, axis=0)
-        
-        EK_U = np.fft.fftshift(EK_U)
-        EK_V = np.fft.fftshift(EK_V)
+
 
         # nx, ny = u_data.shape[1], u_data.shape[2]
         # kx = np.fft.fftfreq(nx, d=dx).reshape(-1, 1)  # Wavenumbers in x
@@ -196,7 +182,23 @@ class FlowField:
         ## t_avg_EK_U = np.mean(EK_U, axis=0)
         ## t_avg_EK_V = np.mean(EK_V, axis=0)
         ## x_avg_EK_U = np.mean(EK_U)
+        
+        eps = 1e-50 # to avoid log(0)
+        N = int(u_data.shape[1] * u_data.shape[2])
+        amplsU = np.fft.fftn(u_data, axes=(1, 2))
+        amplsV = np.fft.fftn(v_data, axes=(1, 2))
+        # amplsU = np.mean(amplsU, axis=0)
+        # amplsV = np.mean(amplsV, axis=0)
+        # Lx = 0.01  # not sure if domain distance length scale
+        Lx = 1
 
+        EK_U  = np.abs(amplsU)**2/(N)
+        EK_V  = np.abs(amplsV)**2/(N)  
+        EK_U = np.mean(EK_U, axis=0)
+        EK_V = np.mean(EK_V, axis=0)
+        
+        EK_U = np.fft.fftshift(EK_U)
+        EK_V = np.fft.fftshift(EK_V)
 
         sign_sizex = np.shape(EK_U)[0]
         sign_sizey = np.shape(EK_U)[1]

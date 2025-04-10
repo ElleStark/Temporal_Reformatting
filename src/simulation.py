@@ -4,6 +4,7 @@
 from math import sqrt
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import mat73
 import numpy as np
 
 class Simulation:
@@ -118,5 +119,28 @@ class Simulation:
                 plt.savefig(f_name, dpi=dpi)
 
 
-    
+    def plot_two_traj_movie(self, filepath, rk4path, frames, domain_width, domain_length, dpi=300):
+        fig, ax = plt.subplots()
+        rk4_data = mat73.loadmat(rk4path)['ParticleTracking']['data'][7500:, :, :]
+
+        positions = plt.scatter(self.trajectories[frames[0], 1, :], self.trajectories[frames[0], 2, :], s=10, alpha=0.6)
+        positions_rk4 = plt.scatter(rk4_data[frames[0], 1, :], rk4_data[frames[0], 2, :], s=10, alpha=0.6)
+
+        # Plotting configuration
+        ax.set(xlim=[0, domain_length], ylim=[0-domain_width/2, domain_width/2], xlabel='x', ylabel='y')
+        ax.set_aspect('equal', adjustable='box')
+
+        def animate(frame):
+            positions.set_offsets(self.trajectories[frame, 1:3, :].T)
+            positions_rk4.set_offsets(rk4_data[frame, 1:3, :].T)
+            return positions,
+
+        # use FuncAnimation from matplotlib
+        ani = animation.FuncAnimation(fig=fig, func=animate, frames=len(frames), blit=False)
+
+        # save and show video
+        f = filepath + '_movie.mp4'
+        writervideo = animation.FFMpegWriter(fps=50)
+        ani.save(f, writer=writervideo)
+
     
