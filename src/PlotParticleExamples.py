@@ -10,7 +10,7 @@ import numpy as np
 # def plot_traj_snap(): 
 
 # Read in H5 Concentration data for background plume
-f_name = 'D:/Re100_0_5mm_50Hz_16source_FTLE_manuscript.h5'
+f_name = 'D:/singlesource_2d_extended/Re100_0_5mm_50Hz_singlesource_2d.h5'
 x_lims = slice(None, None)
 y_lims = slice(None, None)
 time_lims = slice(1153, 1154)
@@ -21,10 +21,10 @@ with h5py.File(f_name, 'r') as f:
         ymesh_uv = f.get('Model Metadata/yGrid')[x_lims, y_lims].T  
 
         # Odor concentration field data
-        odor_c = f.get('Odor Data/c1a')[time_lims, x_lims, y_lims].T
+        odor_c = f.get('Odor Data/c')[time_lims, x_lims, y_lims].T
 
 # Load full trajectory dataset - format is [frame, release_frame, x_pos, y_pos]
-traj_data = np.load('ignore/tests/particleTracking_n20_fullsim.npy')
+traj_data = np.load('ignore/ParticleTrackingData/particleTracking_sim_extended_n20_fullsim_D5em5_RK4method_180to360s.npy')
 
 # Subset to a few particles released at 2 different times
 # Recall integral time scale ~0.15s (~8 frames) at release point
@@ -112,10 +112,10 @@ plt.scatter(select_trajs2[duration-dt_frames-1, 1, idx2], select_trajs2[duration
 # plt.scatter(select_trajs1[duration-1, 1, start_particle1:(start_particle1+n_particles)], select_trajs1[duration-1, 2, start_particle1:(start_particle1+n_particles)], color='#B85B51', alpha=alpha)
 # plt.scatter(select_trajs2[duration-dt_frames-1, 1, start_particle:(start_particle+n_particles)], select_trajs2[duration-dt_frames-1, 2, start_particle:(start_particle+n_particles)], color='#588D9D', alpha=alpha)
 
-plt.ylim(-0.211, 0.211)
-plt.xlim(0, 0.50)
+plt.ylim(-0.3, 0.3)
+plt.xlim(0, 0.750)
 plt.axis("equal")
 # plt.legend()
 
-plt.savefig('ignore/plots/traj_snap_JVposter_simuldet_opt2.png', dpi=600)
+plt.savefig('ignore/plots/traj_snap_comps_simuldet_opt2.png', dpi=600)
 plt.show()
