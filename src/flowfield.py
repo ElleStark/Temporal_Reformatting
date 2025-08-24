@@ -227,12 +227,12 @@ class FlowField:
 
         plt.close()                        
         fig = plt.figure()
-        plt.title("Sensor 1 streamwise power spectrum: x=[0, 0.1], y[-0.20, 0.20]m")
+        plt.title("Sensor 1 concentration power spectrum: x=[0, 0.1], y[-0.15, 0.15]m")
         plt.xlabel(r"omega (rad/s)")
         plt.ylabel(r"Normalized Power")
 
         norm_power = (EK_avsphr-np.min(EK_avsphr)) / (np.max(EK_avsphr) - np.min(EK_avsphr))
-        savemat('ignore/spectra_data/Pspectrum_normalized_det1_wide_omega_udir.mat', {'det1_flowSpectrum_wide_udir': EK_avsphr})
+        savemat('ignore/spectra_data/Cspectrum_det1.mat', {'det1_CSpectrum': EK_avsphr})
 
         realsize = len(np.fft.rfft(u_data[0,0,:]))
         # plt.semilogy(np.arange(0,50),((EK_avsphr[0:50] )),'k')
@@ -246,7 +246,7 @@ class FlowField:
         # plt.loglog(np.arange(5,25),10**3*np.arange(5,25)**(-10/3),'r--')
         # plt.vlines(0.1*np.log10(2*np.pi/(0.22*0.1)), 10**(-5), 10, 'k', 'dashed')
         plt.ylim(10**(-5), 10)
-        plt.savefig('ignore/plots/spectrum_sensor1_wide_omega_udir.png', dpi=600)
+        plt.savefig('ignore/plots/Cspectrum_sensor1.png', dpi=600)
         plt.show()
 
         # realsize = len(np.fft.rfft(u_data[0,:,0]))
